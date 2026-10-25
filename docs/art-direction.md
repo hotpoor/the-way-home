@@ -21,3 +21,15 @@
 黑狗提示词：
 
 > Production 2D sprite animation sheet, TRUE TRANSPARENT background, exactly FOUR columns by TWO rows, eight equal cells. SAME small BLACK DOG in every cell, SIDE PROFILE FACING RIGHT, natural walking-in-place cycle in 8 successive poses in reading order, alternate leg extension and ground contact, tail held slightly raised. Friendly older medium-small village dog, softly floppy ears, short black fur with subtle warm charcoal highlights, no collar. All eight dogs same scale and shape, identical baseline in each cell. Entire dog fits in cell with 15 percent padding, tail and nose do not touch neighboring cells. Warm hand-painted gouache on paper brush style matching an autumn countryside illustrated storybook game. NO background, ground, scenery, shadows, text, labels, cell borders, or numbers. Not vector, not photorealistic. Clean transparent edges for use as a sprite atlas.
+
+## 本地 H3 连续视频步态
+
+老妇人不再使用独立姿势拼出的八帧图集。实际产物为 `public/assets/woman-walk-video.png`、`woman-walk-video.json`、`woman-idle-video.png`。本地原片为 `test-results/gait/woman-gait-source.mp4`，ComfyUI prompt ID `fe43a276-1b17-4931-a040-43310e5125d5`。工作流与种子保留在同目录的 `workflow.json`；该目录不公开发布。
+
+首帧由 GPT imagegen 内置工具依据原角色生成，保存为 `test-results/gait/woman-green.png`。提示词：
+
+> Create ONE single full-body reference image of the SAME elderly Chinese woman from the attached sprite sheet, preserve her face, grey hair, simple wide black hat, long black dress, comfortable black shoes, warm hand-painted gouache texture and silhouette. SIDE PROFILE FACING RIGHT, neutral standing pose with one foot very slightly ahead, both feet visibly planted, arms relaxed. Only ONE woman, not a grid or animation sheet. Entire body fits with at least 12 percent padding at top and bottom and generous empty space left/right. Portrait 2:3 composition, woman centered. Background must be perfectly uniform bright chroma green #00ff00 across the whole image, NO floor, shadows, gradients, texture, scenery, border or text. Black clothing must remain black with painterly folds. This image is the first frame for a side-on walking-in-place video, fixed orthographic view. No extra accessories.
+
+视频实际使用本地 MiniMax H3 FL2VA INT8，8-step Turbo LoRA、res_multistep/simple、384×576、124 帧、24fps、seed 2026102601，相同首尾帧。提示词要求固定正交侧面镜头、居中原地行走、脚跟落地与重心转移、保持帽子黑裙和手绘纹理、纯绿背景、无镜头运动与新增人物。未启用超分或双采。当前本机节点不包含 RTX 超分，不套用其他设备的可用性描述。
+
+检查抽帧后选取 20–77 帧（58 帧，约 2.42 秒），统一裁剪框 `[82,40,298,530]`，保留垂直运动与脚底基线，抑制透明边缘绿溢色；动画相位随行走距离变化。步幅初次校准为 56 世界单位/循环，根据脚掌接触区约 3 像素/帧的后移、画面缩放约 150/490 得到约 22–24 世界单位/秒。此为初次视觉/像素校准，最终自然度仍需试玩反馈，不能当作真人动作捕捉。

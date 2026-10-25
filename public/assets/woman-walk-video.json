@@ -1,0 +1,25 @@
+{
+  "image": "woman-walk-video.png",
+  "columns": 8,
+  "rows": 8,
+  "frameCount": 58,
+  "fps": 24.0,
+  "displayHeight": 150,
+  "displayWidth": 67.96875,
+  "stride": 56.0,
+  "idleFrame": 0,
+  "idleImage": "woman-idle-video.png",
+  "anchorY": 0.9795918367346939,
+  "source": "local-comfyui-minimax-h3-turbo",
+  "sourceFrames": [
+    20,
+    78
+  ],
+  "sourceFPS": 24.0,
+  "crop": [
+    82,
+    40,
+    298,
+    530
+  ]
+}
