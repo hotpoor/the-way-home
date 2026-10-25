@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#ebe1c7"><meta name="description" content="来时的路 · 一位老妇人和一条黑狗的绘本旅程。"><title>来时的路 · The Way Home</title></head><body>
+<main id="game" aria-label="来时的路游戏场景"></main>
+<div class="paper-grain" aria-hidden="true"></div>
+<header><a class="brand" href="./">来时的路<span>THE WAY HOME</span></a><nav><button id="journal">旅途手记 <span>☷</span></button><button id="sound" aria-label="开启声音">声音 · 关</button></nav></header>
+<aside id="chapter"><span class="eyebrow">第一章 · 故乡</span><h2>核桃落下来的时候</h2><p id="objective">沿着小路，去看看那棵老核桃树。</p><span id="progress">记忆碎片 0 / 1</span></aside>
+<section id="intro"><span class="eyebrow">一段关于重逢的绘本旅程</span><h1>走过很远，<br>再走回从前。</h1><p>一位老妇人，一条黑狗。<br>一条路，通往那些还没忘记的日子。</p><button class="primary" id="start">启程 <span>→</span></button><small id="resume-note">第一章试玩 · 约 5 分钟</small></section>
+<div id="subtitle" role="status" aria-live="polite"></div>
+<button id="interact" class="primary" hidden>看看核桃树 <span>E</span></button>
+<footer><span id="hint">点击小路行走 · A / D 或 ← / → 移动</span><span id="save-status">进度保存在这台设备</span></footer>
+<div id="touch"><button aria-label="向左走" id="left">←</button><button aria-label="向右走" id="right">→</button></div>
+<dialog id="book"><button class="close" aria-label="关闭手记">×</button><span class="eyebrow">沿途拾起的日子</span><h2>旅途手记</h2><p id="memory-text">画册还空着。去老树下看看吧。</p><div class="memory"><span>01</span><div><h3>核桃落下来的时候</h3><p id="memory-state">故乡 · 等待拾起</p></div></div><p class="future">下一程：枣树下的光、上学路上的月亮、西安的火车、太原的五年、上海的灯……<br>这些章节尚在制作。</p><button id="export">导出存档</button> <label class="import">导入存档<input id="import" type="file" accept="application/json" hidden></label><button id="reset">重新启程</button><p class="save-help">存档仅保存在当前浏览器。换设备前，可以导出留存。</p></dialog>
+<dialog id="ending"><span class="eyebrow">拾起一页 · 01</span><h2>留着明天吃。</h2><p>她把最后一颗核桃放进口袋。<br>好多年了，原来她还记得那个人的声音。</p><blockquote>“你站远点，我要打了。”</blockquote><p>风吹过树梢，黑狗在小路上等她。</p><button class="primary" id="continue">带着记忆，继续走 →</button><small>第一章试玩结束 · 可以继续在村里散步</small></dialog>
+<script type="module" src="/src/main.js"></script></body></html>
