@@ -47,7 +47,7 @@ let seed=182;function random(){seed=(seed*1664525+1013904223)>>>0;return seed/42
 const leafMap=texture(40,20,c=>{c.fillStyle='#ac853ac0';c.beginPath();c.ellipse(20,10,17,5,-.25,0,7);c.fill();});
 const leaves=Array.from({length:20},()=>{const l=plane(leafMap,9+random()*10,7,random()*1600,random()*800,3);l.userData={speed:8+random()*14,phase:random()*7};return l;});
 const pathY=x=> 635+85*Math.sin(Math.PI*x/1600)+40*x/1600;
-function resize(){const w=innerWidth,h=innerHeight;renderer.setSize(w,h);viewWidth=Math.min(1800,900*w/h);camera.right=viewWidth;camera.bottom=900;camera.updateProjectionMatrix();}
+function resize(){const w=innerWidth,h=innerHeight;renderer.setSize(w,h);viewWidth=Math.min(1800,900*w/h);camera.right=viewWidth;camera.bottom=900;camera.updateProjectionMatrix();cameraLeft=THREE.MathUtils.clamp(state.x-viewWidth*.4,0,Math.max(0,1600-viewWidth));camera.position.x=cameraLeft;}
 addEventListener('resize',resize);resize();loading.remove();
 function save(){const ok=write(storage,state);$('#save-status').textContent=ok?'已存档 · 此浏览器':'无法保存 · 请从手记导出存档';}
 function say(text,duration=5000){$('#subtitle').textContent=text;$('#subtitle').classList.add('visible');dialogueUntil=performance.now()+duration;}
