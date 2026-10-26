@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import './style.css';
 import {fresh, read, write, validate} from './save.js';
 import {advanceWalk,walkFrame} from './walk-cycle.js';
+import {IdleMotion} from './idle-motion.js';
 
 const $ = s => document.querySelector(s);
 const storage = {getItem: k => window.localStorage.getItem(k), setItem: (k,v) => window.localStorage.setItem(k,v)};
@@ -46,6 +47,13 @@ async function loadAtlas(name,columns=4,rows=2,count=8){
  return Array.from({length:count},(_,i)=>{const t=sheet.clone();t.repeat.set(1/columns,1/rows);t.offset.set((i%columns)/columns,1-(Math.floor(i/columns)+1)/rows);t.needsUpdate=true;return t;});
 }
 let paintedWoman,paintedWomanIdle,paintedDog,womanCycle,womanPhase=0;
+async function loadMotion(filename){
+ const response=await fetch(asset(filename));if(!response.ok)throw Error('Motion not available');
+ const meta=await response.json();const maps=await loadAtlas(meta.image,meta.columns,meta.rows,meta.frameCount);
+ const idle=await new THREE.TextureLoader().loadAsync(asset(meta.idleImage));idle.colorSpace=THREE.SRGBColorSpace;
+ return {meta,maps,idle};
+}
+let womanRest,womanIdleMotion;
 try{
  const response=await fetch(asset('woman-walk-video.json'));if(!response.ok)throw Error('Video gait unavailable');
  womanCycle=await response.json();
@@ -53,10 +61,17 @@ try{
  paintedWomanIdle=await new THREE.TextureLoader().loadAsync(asset(womanCycle.idleImage));paintedWomanIdle.colorSpace=THREE.SRGBColorSpace;
  woman.geometry.dispose();woman.geometry=new THREE.PlaneGeometry(womanCycle.displayWidth,womanCycle.displayHeight);
 }catch{womanCycle=null;try{paintedWoman=await loadAtlas('woman-walk.png');}catch{console.warn('Using fallback woman animation');}}
+try{womanRest=await loadMotion('woman-rest-walk-video.json');womanIdleMotion=new IdleMotion(womanRest.meta,{delay:4.5,cooldown:13,exitSeconds:2.2,exitRate:4});}catch{console.warn('Woman idle gesture not available');}
 const dogFrames=Array.from({length:8},(_,i)=>texture(160,110,c=>{const a=i*Math.PI/4;c.fillStyle='#383b293c';c.beginPath();c.ellipse(78,96,55,6,0,0,7);c.fill();c.strokeStyle='#252a24';c.lineWidth=7;c.lineCap='round';for(let j=0;j<4;j++){const x=47+j*17;c.beginPath();c.moveTo(x,68);c.lineTo(x+Math.sin(a+j)*8,94);c.stroke();}c.fillStyle='#242a25';c.beginPath();c.ellipse(75,62,40,20,0,0,7);c.fill();c.beginPath();c.ellipse(112,42,18,21,-.4,0,7);c.fill();c.beginPath();c.ellipse(128,46,19,8,-.1,0,7);c.fill();c.beginPath();c.ellipse(104,49,8,19,-.4,0,7);c.fill();c.strokeStyle='#242a25';c.lineWidth=8;c.beginPath();c.moveTo(39,58);c.quadraticCurveTo(9,46,17,27+Math.sin(a)*5);c.stroke();c.fillStyle='#a99a73';c.fillRect(114,36,2,2);}));
 const dog=plane(dogFrames[0],80,55,state.x-65,0,5);let dogX=state.x-65;
-try{paintedDog=await loadAtlas('dog-walk.png');}catch{console.warn('Using fallback dog animation');}
-if(paintedDog){dog.geometry.dispose();dog.geometry=new THREE.PlaneGeometry(100,100);}
+let dogCycle,dogRest,dogIdleMotion,dogPhase=0;
+try{dogCycle=await loadMotion('dog-walk-video.json');paintedDog=dogCycle.maps;}catch{try{paintedDog=await loadAtlas('dog-walk.png');}catch{console.warn('Using fallback dog animation');}}
+try{dogRest=await loadMotion('dog-rest-walk-video.json');dogIdleMotion=new IdleMotion(dogRest.meta,{delay:2.5,cooldown:11,exitSeconds:1.8,exitRate:2.4});}catch{console.warn('Dog idle gesture not available');}
+if(paintedDog){dog.geometry.dispose();dog.geometry=new THREE.PlaneGeometry(dogCycle?.meta.displayWidth||100,dogCycle?.meta.displayHeight||100);}
+function showMotion(mesh,motion,map){
+ if(mesh.userData.motion!==motion.meta){mesh.geometry.dispose();mesh.geometry=new THREE.PlaneGeometry(motion.meta.displayWidth,motion.meta.displayHeight);mesh.userData.motion=motion.meta;}
+ mesh.material.map=map;return (motion.meta.anchorY-.5)*motion.meta.displayHeight;
+}
 const poleMap=texture(80,300,c=>{c.strokeStyle='#776344';c.lineWidth=5;c.lineCap='round';c.beginPath();c.moveTo(16,285);c.lineTo(68,12);c.stroke();c.strokeStyle='#b09a67';c.lineWidth=1.5;c.beginPath();c.moveTo(15,285);c.lineTo(67,12);c.stroke();});
 const pole=plane(poleMap,55,210,0,0,5);pole.visible=false;
 const walnutMap=texture(40,40,c=>{c.strokeStyle='#f8e9a8';c.lineWidth=2;c.beginPath();c.arc(20,21,17,0,Math.PI*2);c.stroke();c.fillStyle='#6c4a28';c.beginPath();c.ellipse(20,21,11,13,.3,0,7);c.fill();c.strokeStyle='#a28046';c.lineWidth=2;c.beginPath();c.moveTo(20,9);c.bezierCurveTo(11,17,26,24,18,33);c.stroke();});
@@ -90,7 +105,7 @@ function updateUI(){
 if(state.started){$('#start').innerHTML='继续旅程 <span>→</span>';$('#resume-note').textContent='上一次的脚步，已为你留下。';}updateUI();
 $('#start').onclick=()=>{active=true;state.started=true;document.body.classList.add('playing');save();say(state.complete?'黑狗还记得回家的路。':'好多年了。这棵树，倒还认得我。');};
 function dialogOpen(){return Boolean(document.querySelector('dialog[open]'));}
-function interact(){if(!active||dialogOpen())return;const near=nearestNut();
+function interact(){if(!active||dialogOpen())return;womanIdleMotion?.reset();const near=nearestNut();
  if(near){state.collected.push(near.userData.i);chime(520+state.collected.length*90);say(['这一颗，滚得真远。','小时候，总嫌口袋不够大。','“留着明天吃。”'][state.collected.length-1]);if(state.collected.length===3){state.complete=true;save();$('#ending').showModal();} }
  else if(state.hits<3&&Math.abs(state.x-1320)<155&&time-strikeAt>1){strikeAt=time;state.hits++;chime(210+state.hits*40);say(['“你站远点，我要打了。”','她握稳长杆，轻轻敲了敲树枝。','树梢摇晃。像有人在上面笑。'][state.hits-1]);}
  updateUI();save();}
@@ -110,17 +125,29 @@ addEventListener('pagehide',save);document.addEventListener('visibilitychange',(
 let previous=performance.now();
 function frame(now){const dt=Math.min((now-previous)/1000,.05);previous=now;time+=dt;const paused=!active||dialogOpen()||document.hidden;
  const previousX=state.x;
+ const dir=(keys.has('d')||keys.has('arrowright')?1:0)-(keys.has('a')||keys.has('arrowleft')?1:0);
+ const womanIdle=womanIdleMotion?.update(dt,Boolean(dir)||Math.abs(target-state.x)>.2,paused);
  let moving=false;
- if(!paused){const speed=womanCycle?womanCycle.stride*womanCycle.fps/womanCycle.frameCount:110;const dir=(keys.has('d')||keys.has('arrowright')?1:0)-(keys.has('a')||keys.has('arrowleft')?1:0);if(dir)target=THREE.MathUtils.clamp(state.x+dir*speed*dt,70,1510);const delta=target-state.x;state.x+=Math.sign(delta)*Math.min(Math.abs(delta),speed*dt);moving=Math.abs(state.x-previousX)>.0001;if(moving&&time-lastSaved>2){save();lastSaved=time;}}
+ if(!paused&&womanIdle?.allowMove!==false){const speed=womanCycle?womanCycle.stride*womanCycle.fps/womanCycle.frameCount:110;if(dir)target=THREE.MathUtils.clamp(state.x+dir*speed*dt,70,1510);const delta=target-state.x;state.x+=Math.sign(delta)*Math.min(Math.abs(delta),speed*dt);moving=Math.abs(state.x-previousX)>.0001;if(moving&&time-lastSaved>2){save();lastSaved=time;}}
  const desiredLeft=THREE.MathUtils.clamp(state.x-viewWidth*.4,0,Math.max(0,1600-viewWidth));cameraLeft+= (desiredLeft-cameraLeft)*Math.min(1,dt*3);cameraTop+=(THREE.MathUtils.clamp(pathY(state.x)-viewHeight*.78,0,900-viewHeight)-cameraTop)*Math.min(1,dt*3);camera.position.set(cameraLeft,cameraTop,20);
  if(womanCycle)womanPhase=advanceWalk(womanPhase,state.x-previousX,womanCycle.stride);
  const womanOffset=womanCycle?(womanCycle.anchorY-.5)*womanCycle.displayHeight:65;
  woman.position.set(state.x,pathY(state.x)-womanOffset,4);
  const womanIndex=womanCycle?(moving?walkFrame(womanPhase,womanCycle.frameCount):womanCycle.idleFrame):(moving?Math.floor(time*8)%8:0);
  woman.material.map=paintedWomanIdle&&!moving?paintedWomanIdle:paintedWoman?paintedWoman[womanIndex]:(time-strikeAt<.65?strikeFrame:frames[moving?Math.floor(time*9)%8:0]);
+ if(womanRest&&womanIdle?.active){const offset=showMotion(woman,womanRest,womanRest.maps[womanIdle.frame]);woman.position.y=pathY(state.x)-offset;}
+ else if(womanCycle){showMotion(woman,{meta:womanCycle},woman.material.map);}
  pole.visible=active&&time-strikeAt<.65;pole.position.set(state.x+29,pathY(state.x)-144,5);pole.rotation.z=Math.sin((time-strikeAt)*Math.PI/.65)*-.2;
  const facing=state.x<previousX-.0001?-1:state.x>previousX+.0001?1:Math.sign(woman.scale.x);woman.scale.x=facing;
- const dogTarget=Math.max(45,state.x-65);const dogMoving=!paused&&Math.abs(dogTarget-dogX)>4;if(!paused)dogX+=(dogTarget-dogX)*Math.min(1,dt*2.8);dog.position.set(dogX,pathY(dogX)-(paintedDog?35:17),5);dog.material.map=(paintedDog||dogFrames)[dogMoving?Math.floor(time*10)%8:0];if(dogMoving)dog.scale.x=dogTarget<dogX?-1:1;
+ const dogTarget=Math.max(55,state.x-65),previousDogX=dogX;
+ const dogIdle=dogIdleMotion?.update(dt,Math.abs(dogTarget-dogX)>.35||moving,paused);
+ if(!paused&&dogIdle?.allowMove!==false&&Math.abs(dogTarget-dogX)>.08)dogX+=(dogTarget-dogX)*Math.min(1,dt*2.8);
+ const dogMoving=Math.abs(dogX-previousDogX)>.0001;
+ dog.position.set(dogX,pathY(dogX)-(paintedDog?35:17),5);
+ if(dogCycle){dogPhase=advanceWalk(dogPhase,dogX-previousDogX,dogCycle.meta.stride);const map=dogMoving?dogCycle.maps[walkFrame(dogPhase,dogCycle.meta.frameCount)]:dogCycle.idle;if(!dogRest||!dogIdle?.active)dog.position.y=pathY(dogX)-showMotion(dog,dogCycle,map);}
+ else dog.material.map=(paintedDog||dogFrames)[dogMoving?Math.floor(time*10)%8:0];
+ if(dogRest&&dogIdle?.active){dog.position.y=pathY(dogX)-showMotion(dog,dogRest,dogRest.maps[dogIdle.frame]);}
+ if(dogMoving)dog.scale.x=dogX<previousDogX?-1:1;
  nuts.forEach((n,i)=>{n.visible=i<state.hits&&!state.collected.includes(i);if(n.visible){n.userData.fall=Math.min(1,n.userData.fall+dt*.8);n.userData.landed=n.userData.fall>=1;n.position.y=THREE.MathUtils.lerp(420,pathY(n.position.x)-5,n.userData.fall*n.userData.fall);n.rotation.z=n.userData.landed?Math.sin(time*2+i)*.06:time*3;}});
  leaves.forEach(l=>{l.position.x-=dt*l.userData.speed;if(l.position.x<0)l.position.x=1600;l.position.y+=Math.sin(time*.7+l.userData.phase)*dt*5;l.rotation.z=Math.sin(time+l.userData.phase)*.5;});
  const near=nearestNut(),tree=state.hits<3&&Math.abs(state.x-1320)<155;

@@ -1,0 +1,25 @@
+{
+  "image": "dog-rest-walk-video.png",
+  "columns": 11,
+  "rows": 16,
+  "frameCount": 175,
+  "fps": 24.0,
+  "displayHeight": 84.24,
+  "displayWidth": 126.36,
+  "stride": 32.0,
+  "idleFrame": 0,
+  "idleImage": "dog-rest-idle-video.png",
+  "anchorY": 0.859375,
+  "source": "local-comfyui-minimax-h3-turbo",
+  "sourceFrames": [
+    0,
+    175
+  ],
+  "sourceFPS": 24.0,
+  "crop": [
+    0,
+    0,
+    576,
+    384
+  ]
+}

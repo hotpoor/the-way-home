@@ -56,7 +56,7 @@ def review(frames, target):
     (target/'loop-candidates.json').write_text(json.dumps(candidates[:24],indent=2))
 
 
-def atlas(frames, fps, start, end, output, stride):
+def atlas(frames, fps, start, end, output, stride, name='woman', display_height=150, crop=None):
     if not 0 <= start < end <= len(frames):
         raise ValueError('Invalid start/end frame interval')
     selected = frames[start:end]
@@ -64,10 +64,14 @@ def atlas(frames, fps, start, end, output, stride):
     if any(b is None for b in boxes): raise ValueError('Empty keyed frame')
     # One shared crop preserves scale, floor position and natural vertical motion.
     w,h = frames[0].size
-    box=(max(0,min(b[0] for b in boxes)-10),max(0,min(b[1] for b in boxes)-10),
+    box=tuple(crop) if crop else (max(0,min(b[0] for b in boxes)-10),max(0,min(b[1] for b in boxes)-10),
          min(w,max(b[2] for b in boxes)+10),min(h,max(b[3] for b in boxes)+10))
-    cell_h=256;cell_w=math.ceil((box[2]-box[0])/(box[3]-box[1])*cell_h/4)*4
-    columns=8;rows=math.ceil(len(selected)/columns)
+    cell_h=256 if display_height>100 else 192
+    cell_w=math.ceil((box[2]-box[0])/(box[3]-box[1])*cell_h/4)*4
+    columns=min(16,max(4,math.ceil(math.sqrt(len(selected)*cell_h/cell_w))))
+    rows=math.ceil(len(selected)/columns)
+    if cell_w*columns>4096 or cell_h*rows>4096:
+        raise ValueError('Atlas exceeds the mobile texture budget; split the clip or lower cell resolution')
     sheet=Image.new('RGBA',(cell_w*columns,cell_h*rows))
     preview=[]
     for i,f in enumerate(selected):
@@ -76,15 +80,15 @@ def atlas(frames, fps, start, end, output, stride):
         canvas=Image.new('RGBA',image.size,'#e9dfc7');canvas.alpha_composite(image)
         preview.append(canvas.convert('RGB'))
     output.mkdir(parents=True,exist_ok=True)
-    sheet.save(output/'woman-walk-video.png',optimize=True)
-    frames[0].crop(box).resize((cell_w,cell_h),Image.Resampling.LANCZOS).save(output/'woman-idle-video.png')
-    metadata=dict(image='woman-walk-video.png',columns=columns,rows=rows,frameCount=len(selected),fps=fps,
-                  displayHeight=150,displayWidth=150*cell_w/cell_h,stride=stride,idleFrame=0,
-                  idleImage='woman-idle-video.png',
+    sheet.save(output/f'{name}-walk-video.png',optimize=True)
+    frames[0].crop(box).resize((cell_w,cell_h),Image.Resampling.LANCZOS).save(output/f'{name}-idle-video.png')
+    metadata=dict(image=f'{name}-walk-video.png',columns=columns,rows=rows,frameCount=len(selected),fps=fps,
+                  displayHeight=display_height,displayWidth=display_height*cell_w/cell_h,stride=stride,idleFrame=0,
+                  idleImage=f'{name}-idle-video.png',
                   anchorY=float((np.median([b[3] for b in boxes])-box[1])/(box[3]-box[1])),
                   source='local-comfyui-minimax-h3-turbo',sourceFrames=[start,end],sourceFPS=fps,crop=list(box))
-    (output/'woman-walk-video.json').write_text(json.dumps(metadata,indent=2)+'\n')
-    preview[0].save(output/'woman-walk-review.gif',save_all=True,append_images=preview[1:],duration=round(1000/fps),loop=0)
+    (output/f'{name}-walk-video.json').write_text(json.dumps(metadata,indent=2)+'\n')
+    preview[0].save(output/f'{name}-walk-review.gif',save_all=True,append_images=preview[1:],duration=round(1000/fps),loop=0)
     print(json.dumps(metadata))
 
 
@@ -93,9 +97,11 @@ if __name__=='__main__':
     p.add_argument('video',type=Path);p.add_argument('--output',type=Path,required=True)
     p.add_argument('--review',action='store_true');p.add_argument('--start',type=int);p.add_argument('--end',type=int)
     p.add_argument('--stride',type=float,default=66,help='World distance per full gait cycle; calibrate against foot contact')
+    p.add_argument('--name',default='woman');p.add_argument('--display-height',type=float,default=150)
+    p.add_argument('--crop',type=int,nargs=4,help='Shared crop for related clips, left top right bottom')
     a=p.parse_args();a.output.mkdir(parents=True,exist_ok=True)
     frames,fps=read_video(a.video)
     if a.review:review(frames,a.output)
     else:
         if a.start is None or a.end is None:p.error('Inspect --review first, then supply --start and --end')
-        atlas(frames,fps,a.start,a.end,a.output,a.stride)
+        atlas(frames,fps,a.start,a.end,a.output,a.stride,a.name,a.display_height,a.crop)
