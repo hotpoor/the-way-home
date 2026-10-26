@@ -167,11 +167,11 @@ $('#reset').onclick=async()=>{if(!confirm('重新启程会覆盖本浏览器的�
 addEventListener('pagehide',save);document.addEventListener('visibilitychange',()=>{if(document.hidden){keys.clear();save();}});
 let previous=performance.now();
 function frame(now){const dt=Math.min((now-previous)/1000,.05);previous=now;time+=dt;const paused=!active||dialogOpen()||document.hidden||changingScene;
- const previousX=state.x;
+ const previousX=state.x,pace=womanCycle?.playbackRate??1;
  const dir=(keys.has('d')||keys.has('arrowright')?1:0)-(keys.has('a')||keys.has('arrowleft')?1:0);
  const womanIdle=womanIdleMotion?.update(dt,Boolean(dir)||Math.abs(target-state.x)>.2,paused);
  let moving=false;
- if(!paused&&womanIdle?.allowMove!==false){const speed=womanCycle?womanCycle.stride*womanCycle.fps/womanCycle.frameCount:110;if(dir)target=THREE.MathUtils.clamp(state.x+dir*speed*dt,70,1510);const delta=target-state.x;state.x+=Math.sign(delta)*Math.min(Math.abs(delta),speed*dt);moving=Math.abs(state.x-previousX)>.0001;if(moving&&time-lastSaved>2){save();lastSaved=time;}}
+ if(!paused&&womanIdle?.allowMove!==false){const speed=(womanCycle?womanCycle.stride*womanCycle.fps/womanCycle.frameCount:110)*pace;if(dir)target=THREE.MathUtils.clamp(state.x+dir*speed*dt,70,1510);const delta=target-state.x;state.x+=Math.sign(delta)*Math.min(Math.abs(delta),speed*dt);moving=Math.abs(state.x-previousX)>.0001;if(moving&&time-lastSaved>2){save();lastSaved=time;}}
  const desiredLeft=THREE.MathUtils.clamp(state.x-viewWidth*.4,0,Math.max(0,1600-viewWidth));cameraLeft+= (desiredLeft-cameraLeft)*Math.min(1,dt*3);cameraTop+=(THREE.MathUtils.clamp(pathY(state.x)-viewHeight*.78,0,900-viewHeight)-cameraTop)*Math.min(1,dt*3);camera.position.set(cameraLeft,cameraTop,20);
  if(womanCycle)womanPhase=advanceWalk(womanPhase,state.x-previousX,womanCycle.stride);
  const womanOffset=womanCycle?(womanCycle.anchorY-.5)*womanCycle.displayHeight:65;
@@ -184,7 +184,7 @@ function frame(now){const dt=Math.min((now-previous)/1000,.05);previous=now;time
  const facing=state.x<previousX-.0001?-1:state.x>previousX+.0001?1:Math.sign(woman.scale.x);woman.scale.x=facing;
  const dogTarget=Math.max(55,state.x-65),previousDogX=dogX;
  const dogIdle=dogIdleMotion?.update(dt,Math.abs(dogTarget-dogX)>.08||moving,paused);
- if(!paused&&dogIdle?.allowMove!==false&&Math.abs(dogTarget-dogX)>.08)dogX+=(dogTarget-dogX)*Math.min(1,dt*2.8);
+ if(!paused&&dogIdle?.allowMove!==false&&Math.abs(dogTarget-dogX)>.08)dogX+=(dogTarget-dogX)*Math.min(1,dt*2.8*pace);
  const dogMoving=Math.abs(dogX-previousDogX)>.0001;
  dog.position.set(dogX,pathY(dogX)-(paintedDog?35:17),5);
  dogBlend.reset();

@@ -5,7 +5,7 @@ await p.addInitScript(()=>{if(!localStorage.getItem('the-way-home.save.v1'))loca
 await p.goto(process.env.GAME_URL||'http://127.0.0.1:4173/');await p.waitForSelector('.loading',{state:'detached'});await p.locator('#start').click();await p.locator('#journal').click();await p.locator('#visit-garden').click();await expect(p.locator('#chapter h2')).toHaveText('枣树下的光');
 await p.screenshot({path:'test-results/garden-scene.png'});
 // Walk the real route from the courtyard entrance to the tree.
-await p.keyboard.down('ArrowRight');await p.waitForTimeout(14000);await p.keyboard.up('ArrowRight');await expect(p.locator('#interact')).toBeVisible();await p.locator('#interact').click();
+await p.keyboard.down('ArrowRight');await p.waitForTimeout(12000);await p.keyboard.up('ArrowRight');await expect(p.locator('#interact')).toBeVisible();await p.locator('#interact').click();
 const pick=id=>p.locator(`[data-garden-pick="${id}"]`).click();
 await pick('young');await expect(p.locator('.garden-feedback')).toContainText('细弱');await pick('adult');await pick('ring-0');await pick('ring-1');
 await p.locator('.garden-close').click();await p.reload();await p.waitForSelector('.loading',{state:'detached'});await p.locator('#start').click();await p.locator('#interact').click();await expect(p.locator('[data-garden-pick="ring-0"]')).toHaveAttribute('aria-pressed','true');
