@@ -5,6 +5,7 @@ import {advanceWalk,walkFrame,walkBlend} from './walk-cycle.js';
 import {IdleMotion} from './idle-motion.js';
 import {atlasBlend} from './atlas-blend.js';
 import {createGarden} from './garden.js';
+import {propUrl} from './props.js';
 import {createJourney} from './journey.js';
 import {chapters,chapterById,isComplete,isUnlocked,memoryCount} from './chapters.js';
 
@@ -98,8 +99,8 @@ function showMotion(mesh,motion,map){
 }
 const poleMap=texture(80,300,c=>{c.strokeStyle='#776344';c.lineWidth=5;c.lineCap='round';c.beginPath();c.moveTo(16,285);c.lineTo(68,12);c.stroke();c.strokeStyle='#b09a67';c.lineWidth=1.5;c.beginPath();c.moveTo(15,285);c.lineTo(67,12);c.stroke();});
 const pole=plane(poleMap,55,210,0,0,5);pole.visible=false;
-const walnutMap=texture(40,40,c=>{c.strokeStyle='#f8e9a8';c.lineWidth=2;c.beginPath();c.arc(20,21,17,0,Math.PI*2);c.stroke();c.fillStyle='#6c4a28';c.beginPath();c.ellipse(20,21,11,13,.3,0,7);c.fill();c.strokeStyle='#a28046';c.lineWidth=2;c.beginPath();c.moveTo(20,9);c.bezierCurveTo(11,17,26,24,18,33);c.stroke();});
-const nuts=[1200,1330,1430].map((x,i)=>{const n=plane(walnutMap,24,24,x,0,6);n.userData={i,landed:false,fall:0};return n;});
+const walnutMap=await new THREE.TextureLoader().loadAsync(propUrl('walnut'));walnutMap.colorSpace=THREE.SRGBColorSpace;
+const nuts=[1200,1330,1430].map((x,i)=>{const n=plane(walnutMap,32,32,x,0,6);n.userData={i,landed:false,fall:0};return n;});
 // A restrained layer of wind-blown leaves adds depth without moving the painting.
 let seed=182;function random(){seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;}
 const leafMap=texture(40,20,c=>{c.fillStyle='#ac853ac0';c.beginPath();c.ellipse(20,10,17,5,-.25,0,7);c.fill();});
