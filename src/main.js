@@ -54,6 +54,9 @@ async function loadMotion(filename){
  return {meta,maps,idle};
 }
 let womanRest,womanIdleMotion;
+let lastIdleStart=-100;
+function idleGate(){if(time-lastIdleStart<3.2)return false;lastIdleStart=time;return true;}
+async function motionPool(names){const clips=[];for(const name of names){try{clips.push(await loadMotion(name+'-walk-video.json'));}catch{console.warn('Motion unavailable: '+name);}}return clips;}
 try{
  const response=await fetch(asset('woman-walk-video.json'));if(!response.ok)throw Error('Video gait unavailable');
  womanCycle=await response.json();
@@ -61,12 +64,14 @@ try{
  paintedWomanIdle=await new THREE.TextureLoader().loadAsync(asset(womanCycle.idleImage));paintedWomanIdle.colorSpace=THREE.SRGBColorSpace;
  woman.geometry.dispose();woman.geometry=new THREE.PlaneGeometry(womanCycle.displayWidth,womanCycle.displayHeight);
 }catch{womanCycle=null;try{paintedWoman=await loadAtlas('woman-walk.png');}catch{console.warn('Using fallback woman animation');}}
-try{womanRest=await loadMotion('woman-rest-walk-video.json');womanIdleMotion=new IdleMotion(womanRest.meta,{delay:4.5,cooldown:13,exitSeconds:2.2,exitRate:4});}catch{console.warn('Woman idle gesture not available');}
+womanRest=await motionPool(['woman-hair','woman-look']);
+if(womanRest.length)womanIdleMotion=new IdleMotion(womanRest.map(c=>c.meta),{delay:5,cooldown:14,jitter:11,exitSeconds:1.2,exitRate:3,gate:idleGate});
 const dogFrames=Array.from({length:8},(_,i)=>texture(160,110,c=>{const a=i*Math.PI/4;c.fillStyle='#383b293c';c.beginPath();c.ellipse(78,96,55,6,0,0,7);c.fill();c.strokeStyle='#252a24';c.lineWidth=7;c.lineCap='round';for(let j=0;j<4;j++){const x=47+j*17;c.beginPath();c.moveTo(x,68);c.lineTo(x+Math.sin(a+j)*8,94);c.stroke();}c.fillStyle='#242a25';c.beginPath();c.ellipse(75,62,40,20,0,0,7);c.fill();c.beginPath();c.ellipse(112,42,18,21,-.4,0,7);c.fill();c.beginPath();c.ellipse(128,46,19,8,-.1,0,7);c.fill();c.beginPath();c.ellipse(104,49,8,19,-.4,0,7);c.fill();c.strokeStyle='#242a25';c.lineWidth=8;c.beginPath();c.moveTo(39,58);c.quadraticCurveTo(9,46,17,27+Math.sin(a)*5);c.stroke();c.fillStyle='#a99a73';c.fillRect(114,36,2,2);}));
 const dog=plane(dogFrames[0],80,55,state.x-65,0,5);let dogX=state.x-65;
 let dogCycle,dogRest,dogIdleMotion,dogPhase=0;
 try{dogCycle=await loadMotion('dog-walk-video.json');paintedDog=dogCycle.maps;}catch{try{paintedDog=await loadAtlas('dog-walk.png');}catch{console.warn('Using fallback dog animation');}}
-try{dogRest=await loadMotion('dog-rest-walk-video.json');dogIdleMotion=new IdleMotion(dogRest.meta,{delay:2.5,cooldown:11,exitSeconds:1.8,exitRate:2.4});}catch{console.warn('Dog idle gesture not available');}
+dogRest=await motionPool(['dog-rest','dog-sniff','dog-look']);
+if(dogRest.length)dogIdleMotion=new IdleMotion(dogRest.map(c=>c.meta),{delay:2.5,cooldown:9,jitter:13,exitSeconds:1.8,exitRate:2.4,gate:idleGate});
 if(paintedDog){dog.geometry.dispose();dog.geometry=new THREE.PlaneGeometry(dogCycle?.meta.displayWidth||100,dogCycle?.meta.displayHeight||100);}
 function showMotion(mesh,motion,map){
  if(mesh.userData.motion!==motion.meta){mesh.geometry.dispose();mesh.geometry=new THREE.PlaneGeometry(motion.meta.displayWidth,motion.meta.displayHeight);mesh.userData.motion=motion.meta;}
@@ -135,7 +140,7 @@ function frame(now){const dt=Math.min((now-previous)/1000,.05);previous=now;time
  woman.position.set(state.x,pathY(state.x)-womanOffset,4);
  const womanIndex=womanCycle?(moving?walkFrame(womanPhase,womanCycle.frameCount):womanCycle.idleFrame):(moving?Math.floor(time*8)%8:0);
  woman.material.map=paintedWomanIdle&&!moving?paintedWomanIdle:paintedWoman?paintedWoman[womanIndex]:(time-strikeAt<.65?strikeFrame:frames[moving?Math.floor(time*9)%8:0]);
- if(womanRest&&womanIdle?.active){const offset=showMotion(woman,womanRest,womanRest.maps[womanIdle.frame]);woman.position.y=pathY(state.x)-offset;}
+ if(womanRest.length&&!moving){const clip=womanIdle?.active?womanRest[womanIdle.clip]:womanRest[0];const offset=showMotion(woman,clip,womanIdle?.active?clip.maps[womanIdle.frame]:clip.idle);woman.position.y=pathY(state.x)-offset;}
  else if(womanCycle){showMotion(woman,{meta:womanCycle},woman.material.map);}
  pole.visible=active&&time-strikeAt<.65;pole.position.set(state.x+29,pathY(state.x)-144,5);pole.rotation.z=Math.sin((time-strikeAt)*Math.PI/.65)*-.2;
  const facing=state.x<previousX-.0001?-1:state.x>previousX+.0001?1:Math.sign(woman.scale.x);woman.scale.x=facing;
@@ -144,9 +149,9 @@ function frame(now){const dt=Math.min((now-previous)/1000,.05);previous=now;time
  if(!paused&&dogIdle?.allowMove!==false&&Math.abs(dogTarget-dogX)>.08)dogX+=(dogTarget-dogX)*Math.min(1,dt*2.8);
  const dogMoving=Math.abs(dogX-previousDogX)>.0001;
  dog.position.set(dogX,pathY(dogX)-(paintedDog?35:17),5);
- if(dogCycle){dogPhase=advanceWalk(dogPhase,dogX-previousDogX,dogCycle.meta.stride);const map=dogMoving?dogCycle.maps[walkFrame(dogPhase,dogCycle.meta.frameCount)]:dogCycle.idle;if(!dogRest||!dogIdle?.active)dog.position.y=pathY(dogX)-showMotion(dog,dogCycle,map);}
+ if(dogCycle){dogPhase=advanceWalk(dogPhase,dogX-previousDogX,dogCycle.meta.stride);const map=dogMoving?dogCycle.maps[walkFrame(dogPhase,dogCycle.meta.frameCount)]:dogCycle.idle;if(!dogRest.length||!dogIdle?.active)dog.position.y=pathY(dogX)-showMotion(dog,dogCycle,map);}
  else dog.material.map=(paintedDog||dogFrames)[dogMoving?Math.floor(time*10)%8:0];
- if(dogRest&&dogIdle?.active){dog.position.y=pathY(dogX)-showMotion(dog,dogRest,dogRest.maps[dogIdle.frame]);}
+ if(dogRest.length&&dogIdle?.active){const clip=dogRest[dogIdle.clip];dog.position.y=pathY(dogX)-showMotion(dog,clip,clip.maps[dogIdle.frame]);}
  if(dogMoving)dog.scale.x=dogX<previousDogX?-1:1;
  nuts.forEach((n,i)=>{n.visible=i<state.hits&&!state.collected.includes(i);if(n.visible){n.userData.fall=Math.min(1,n.userData.fall+dt*.8);n.userData.landed=n.userData.fall>=1;n.position.y=THREE.MathUtils.lerp(420,pathY(n.position.x)-5,n.userData.fall*n.userData.fall);n.rotation.z=n.userData.landed?Math.sin(time*2+i)*.06:time*3;}});
  leaves.forEach(l=>{l.position.x-=dt*l.userData.speed;if(l.position.x<0)l.position.x=1600;l.position.y+=Math.sin(time*.7+l.userData.phase)*dt*5;l.rotation.z=Math.sin(time+l.userData.phase)*.5;});
