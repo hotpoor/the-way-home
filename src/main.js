@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import './style.css';
 import {fresh, read, write, validate} from './save.js';
-import {advanceWalk,walkFrame} from './walk-cycle.js';
+import {advanceWalk,walkFrame,walkBlend} from './walk-cycle.js';
 import {IdleMotion} from './idle-motion.js';
+import {atlasBlend} from './atlas-blend.js';
 
 const $ = s => document.querySelector(s);
 const storage = {getItem: k => window.localStorage.getItem(k), setItem: (k,v) => window.localStorage.setItem(k,v)};
@@ -68,6 +69,7 @@ womanRest=await motionPool(['woman-hair','woman-look']);
 if(womanRest.length)womanIdleMotion=new IdleMotion(womanRest.map(c=>c.meta),{delay:5,cooldown:14,jitter:11,exitSeconds:1.2,exitRate:3,gate:idleGate});
 const dogFrames=Array.from({length:8},(_,i)=>texture(160,110,c=>{const a=i*Math.PI/4;c.fillStyle='#383b293c';c.beginPath();c.ellipse(78,96,55,6,0,0,7);c.fill();c.strokeStyle='#252a24';c.lineWidth=7;c.lineCap='round';for(let j=0;j<4;j++){const x=47+j*17;c.beginPath();c.moveTo(x,68);c.lineTo(x+Math.sin(a+j)*8,94);c.stroke();}c.fillStyle='#242a25';c.beginPath();c.ellipse(75,62,40,20,0,0,7);c.fill();c.beginPath();c.ellipse(112,42,18,21,-.4,0,7);c.fill();c.beginPath();c.ellipse(128,46,19,8,-.1,0,7);c.fill();c.beginPath();c.ellipse(104,49,8,19,-.4,0,7);c.fill();c.strokeStyle='#242a25';c.lineWidth=8;c.beginPath();c.moveTo(39,58);c.quadraticCurveTo(9,46,17,27+Math.sin(a)*5);c.stroke();c.fillStyle='#a99a73';c.fillRect(114,36,2,2);}));
 const dog=plane(dogFrames[0],80,55,state.x-65,0,5);let dogX=state.x-65;
+const dogBlend=atlasBlend(dog.material);
 let dogCycle,dogRest,dogIdleMotion,dogPhase=0;
 try{dogCycle=await loadMotion('dog-walk-video.json');paintedDog=dogCycle.maps;}catch{try{paintedDog=await loadAtlas('dog-walk.png');}catch{console.warn('Using fallback dog animation');}}
 dogRest=await motionPool(['dog-rest','dog-sniff','dog-look']);
@@ -145,11 +147,20 @@ function frame(now){const dt=Math.min((now-previous)/1000,.05);previous=now;time
  pole.visible=active&&time-strikeAt<.65;pole.position.set(state.x+29,pathY(state.x)-144,5);pole.rotation.z=Math.sin((time-strikeAt)*Math.PI/.65)*-.2;
  const facing=state.x<previousX-.0001?-1:state.x>previousX+.0001?1:Math.sign(woman.scale.x);woman.scale.x=facing;
  const dogTarget=Math.max(55,state.x-65),previousDogX=dogX;
- const dogIdle=dogIdleMotion?.update(dt,Math.abs(dogTarget-dogX)>.35||moving,paused);
+ const dogIdle=dogIdleMotion?.update(dt,Math.abs(dogTarget-dogX)>.08||moving,paused);
  if(!paused&&dogIdle?.allowMove!==false&&Math.abs(dogTarget-dogX)>.08)dogX+=(dogTarget-dogX)*Math.min(1,dt*2.8);
  const dogMoving=Math.abs(dogX-previousDogX)>.0001;
  dog.position.set(dogX,pathY(dogX)-(paintedDog?35:17),5);
- if(dogCycle){dogPhase=advanceWalk(dogPhase,dogX-previousDogX,dogCycle.meta.stride);const map=dogMoving?dogCycle.maps[walkFrame(dogPhase,dogCycle.meta.frameCount)]:dogCycle.idle;if(!dogRest.length||!dogIdle?.active)dog.position.y=pathY(dogX)-showMotion(dog,dogCycle,map);}
+ dogBlend.reset();
+ if(dogCycle){
+  dogPhase=advanceWalk(dogPhase,dogX-previousDogX,dogCycle.meta.stride);
+  const blend=walkBlend(dogPhase,dogCycle.meta.frameCount,dogCycle.meta.poseFrameStep||1);
+  const map=dogMoving?dogCycle.maps[blend.current]:dogCycle.idle;
+  if(!dogRest.length||!dogIdle?.active){
+   dog.position.y=pathY(dogX)-showMotion(dog,dogCycle,map);
+   if(dogMoving)dogBlend.set(map,dogCycle.maps[blend.next],blend.amount);
+  }
+ }
  else dog.material.map=(paintedDog||dogFrames)[dogMoving?Math.floor(time*10)%8:0];
  if(dogRest.length&&dogIdle?.active){const clip=dogRest[dogIdle.clip];dog.position.y=pathY(dogX)-showMotion(dog,clip,clip.maps[dogIdle.frame]);}
  if(dogMoving)dog.scale.x=dogX<previousDogX?-1:1;

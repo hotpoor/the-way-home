@@ -9,3 +9,12 @@ test('pausing preserves phase and backwards travel advances the cycle',()=>{
  assert.equal(advanceWalk(.25,0,66),.25);assert.equal(advanceWalk(.25,-16.5,66),.5);
  assert.equal(walkFrame(.9999,48),47);assert.equal(walkFrame(1,48),0);
 });
+
+test('walk blending follows distance continuously across paired poses and the loop seam',async()=>{
+ const {walkBlend}=await import('./walk-cycle.js');
+ assert.deepEqual(walkBlend(0,32,2),{current:0,next:2,amount:0});
+ assert.deepEqual(walkBlend(1/32,32,2),{current:0,next:2,amount:.5});
+ assert.deepEqual(walkBlend(31/32,32,2),{current:30,next:0,amount:.5});
+ assert.deepEqual(walkBlend(1,32,2),walkBlend(0,32,2));
+ assert.throws(()=>walkBlend(0,31,2),/Invalid/);
+});

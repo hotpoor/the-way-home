@@ -1,9 +1,9 @@
 {
-  "image": "dog-walk-video.png",
-  "columns": 5,
-  "rows": 7,
-  "frameCount": 32,
-  "fps": 24.0,
+  "image": "dog-walk-smooth.png",
+  "columns": 7,
+  "rows": 10,
+  "frameCount": 64,
+  "fps": 48.0,
   "displayHeight": 84.24,
   "displayWidth": 126.36,
   "stride": 32.0,
@@ -21,5 +21,38 @@
     0,
     576,
     384
-  ]
+  ],
+  "poseFrameStep": 1,
+  "smoothing": {
+    "method": "bidirectional-optical-flow",
+    "inputImage": "dog-walk-video.png",
+    "inputPoseStep": 2,
+    "subframes": 4,
+    "inputMetadata": {
+      "image": "dog-walk-video.png",
+      "columns": 5,
+      "rows": 7,
+      "frameCount": 32,
+      "fps": 24.0,
+      "displayHeight": 84.24,
+      "displayWidth": 126.36,
+      "stride": 32.0,
+      "idleFrame": 0,
+      "idleImage": "dog-idle-video.png",
+      "anchorY": 0.859375,
+      "source": "local-comfyui-minimax-h3-turbo",
+      "sourceFrames": [
+        9,
+        41
+      ],
+      "sourceFPS": 24.0,
+      "crop": [
+        0,
+        0,
+        576,
+        384
+      ],
+      "poseFrameStep": 2
+    }
+  }
 }
