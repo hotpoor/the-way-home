@@ -71,3 +71,42 @@ dialog{max-height:calc(100dvh - 32px - var(--safe-top) - var(--safe-bottom));max
 #garden-ending .primary{font-size:14px;line-height:24px;letter-spacing:0;max-width:100%}
 @media(max-width:650px){#garden{padding:32px 16px 24px}.garden-body h2{font-size:20px;line-height:28px}.garden-story{font-size:14px;line-height:24px}.garden-work{min-height:240px}.garden-work .garden-target{max-width:88px}.garden-result{padding:24px 0}.garden-result blockquote{font-size:18px;line-height:28px}.garden-feedback{min-height:72px}}
 @media(max-height:520px) and (min-width:600px){#garden{padding:24px}.garden-work{min-height:200px;max-height:240px}.garden-story{font-size:14px;line-height:20px}.garden-body h2{margin:8px 0}}
+/* Later memories share the paper, type and controls of the original notebook. */
+#journey{width:min(920px,calc(100vw - 24px));padding:32px;background:#f2ead5}
+.journey-body{min-width:0}.journey-body h2{font-size:24px;line-height:32px;margin:12px 0;text-wrap:balance}
+.journey-story{max-width:720px;margin:12px 0 16px;text-wrap:pretty}
+.journey-instruction{font-size:14px;line-height:24px;margin:16px 0 8px}
+.journey-feedback{min-height:48px;font-size:14px;line-height:24px;color:#536045}
+.journey-choices,.ride-controls,.sketch-tools{display:flex;gap:8px;flex-wrap:wrap;margin:16px 0}
+.journey-body button:not(.primary){min-height:44px;padding:8px 12px;font-size:14px;line-height:20px;border:1px solid #a99d7e;background:#e8dfc9}
+.journey-body button:hover:not(:disabled){background:#d6d8ba}.journey-body button:active:not(:disabled){filter:brightness(.94)}
+.journey-body button[aria-pressed=true]{background:#576c48;color:#fff5dc}.journey-body .primary{font-size:14px;line-height:24px;letter-spacing:.04em;max-width:100%}
+.memory-illustration{display:block;width:100%;height:clamp(160px,25vw,240px);background:#e9dfc7;border:1px solid #c9bea3}
+.journey-result{padding:32px 16px;max-width:680px;margin:auto}.journey-result blockquote{font-size:20px;line-height:32px;margin:32px 0}
+.order-board{display:flex;flex-wrap:wrap;gap:8px;background:#e5dbc2;padding:24px;border:1px solid #c3b695;min-height:120px;align-items:center}
+.order-board span{padding:12px;background:#f5ecd6;min-width:64px;text-align:center;font-size:14px;line-height:24px}
+.model-board{flex-direction:column-reverse;gap:4px}.model-board span{width:70%;padding:8px;background:#cbbb97;border:1px solid #9c8c68}
+.conversation-line{padding:24px;background:#e8dfc7;border:1px solid #c9bea3}.conversation-line>span{font-size:12px;color:#716d54}.conversation-line blockquote{font-size:20px;line-height:32px}
+.schedule-slots{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.schedule-slots span{padding:16px;background:#e5dbc2;min-height:64px;font-size:14px;line-height:24px}
+.plan-trace{position:relative;width:100%;height:320px;background:#e9dfc7;border:1px solid #c9bea3}.plan-trace svg{position:absolute;inset:0;width:100%;height:100%}
+.plan-trace button{position:absolute;transform:translate(-50%,-50%);min-width:44px;min-height:44px;border-radius:50%}
+.plan-trace button.selected{background:#576c48;color:#fff5dc;opacity:1}
+.layout-plan{padding:32px;background:#d6d4b6;border:1px solid #b7b391}.plan-room{position:relative;border:6px solid #8c7d60;background:#f1e4c9;max-width:520px;height:260px;margin:auto}
+.plan-window{position:absolute;top:-8px;left:24px;right:24px;background:#94836a;color:#fff5dc;padding:8px;text-align:center;font-size:14px;line-height:24px}.plan-window.open{background:#93a6a0;color:#2f453b}
+.plan-table{position:absolute;top:96px;left:32px;right:32px;padding:24px;background:#b29b75;text-align:center;font-size:14px}
+.plan-walk{position:absolute;bottom:8px;left:16px;right:16px;padding:12px;text-align:center;color:#7f6847;font-size:14px;border:1px dashed #8d8260}.plan-walk.clear{background:#ced8b2;color:#3a5538}.plan-room:has(.clear) .plan-table{left:55%;right:12px;top:80px;padding:16px 8px}
+.design-garden{padding:32px;min-height:200px;border:8px solid #a69e7c;background:#d6d8b3;text-align:center}.design-title{font-size:20px;line-height:32px;margin-bottom:24px}#design-parts{font-size:18px;line-height:32px}
+.plant-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}.plant{display:flex;flex-direction:column;gap:12px;align-items:stretch;padding:16px;background:#e5dbc2;text-align:center;min-width:0}.plant>span{font-size:64px;line-height:80px;color:#65784f}.plant label{font-size:14px}.plant meter{width:100%;height:24px}
+.sketch-tools button[data-color]{width:44px;height:44px;background:var(--paint)!important;border:4px solid #eee4cc!important;border-radius:50%}.sketch-tools button[data-color][aria-pressed=true]{outline:2px solid #526449;outline-offset:2px}
+.sketch-canvas{display:block;width:100%;aspect-ratio:720/400;height:auto;background:#f5ecd6;border:1px solid #b8ac8e;touch-action:none}
+.profile-label{display:block;margin:16px 0 8px;font-size:14px;line-height:24px}#profile-text{width:100%;resize:vertical;min-height:144px;padding:16px;border:1px solid #a99d7e;background:#f8f0db;color:#353d30;font-family:inherit;font-size:16px;line-height:24px}
+.profile-preview{margin:24px 0;padding:24px;border:1px solid #c9bea3;background:#e9dfc7;overflow-wrap:anywhere}.profile-preview p{white-space:pre-wrap}
+.memory-palette{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.memory-palette button{text-align:left}.collage-slots{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;padding:24px 0}.collage-slots button{min-height:88px!important;font-size:12px!important;overflow-wrap:anywhere}
+.ride-stage{position:relative;border:1px solid #b8ac8e;background:#d4c7a3}.ride-stage canvas{display:block;width:100%;height:auto;aspect-ratio:2/1}.ride-hud{display:flex;justify-content:space-between;gap:16px;padding:12px 16px;font-size:14px;line-height:24px;background:#eee3c8}
+#ride-brake{touch-action:none;user-select:none}.ride-controls button{flex:1;min-width:88px}
+.chapter-index{display:grid;gap:8px;margin:24px 0}.chapter-index button{text-align:left;display:grid;grid-template-columns:32px 1fr;gap:8px;align-items:center;min-height:48px;border:1px solid #c9bea3!important;padding:12px!important}.chapter-index button[aria-current=true]{background:#d8ddbe}.chapter-index small{margin:4px 0 0;font-size:12px;line-height:16px;letter-spacing:0}.chapter-index button>span:first-child{font-size:20px;color:#8e896a}
+#chapter-stay,#garden-continue,#finale-journal{display:block;margin-top:16px}.credits{margin-top:32px;font-size:12px;line-height:24px}.credits summary{cursor:pointer;min-height:44px;padding:8px}
+@media(max-width:650px){#journey{padding:32px 16px 24px}.journey-body h2{font-size:20px;line-height:28px}.journey-story{font-size:14px;line-height:24px}.journey-result{padding:24px 0}.journey-result blockquote{font-size:18px;line-height:28px}.journey-choices{flex-direction:column}.journey-choices button{text-align:left}.schedule-slots{grid-template-columns:repeat(2,minmax(0,1fr))}.plan-trace{height:240px}.layout-plan{padding:16px}.plan-room{height:260px}.plant-row{gap:8px}.plant{padding:8px}.plant button{font-size:12px!important;padding:8px!important}.plant>span{font-size:48px;line-height:64px}.memory-palette{grid-template-columns:1fr}.collage-slots{grid-template-columns:repeat(2,minmax(0,1fr))}.ride-hud{flex-direction:column;gap:4px;font-size:12px;line-height:20px}.ride-controls{gap:8px}.ride-controls button{min-width:96px}.order-board{padding:16px}.order-board span{min-width:48px;padding:8px}.sketch-tools{gap:12px}.profile-preview{padding:16px}.journey-instruction{line-height:24px}.journey-body .primary{padding:12px;font-size:14px;line-height:24px}}
+@media(max-height:520px) and (min-width:600px){#journey{padding:24px}.memory-illustration{height:160px}.ride-stage canvas{max-height:240px}.journey-body h2{margin:8px 0}.journey-story{font-size:14px;line-height:24px}}
+/* Keep the close control reachable while long memory pages scroll. */
+#journey>.close,#book>.close{position:sticky;top:0;right:0;float:right;z-index:2;background:#f2ead5}

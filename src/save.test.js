@@ -18,3 +18,20 @@ test('chapter two and partial garden progress survive export and reload',()=>{
  assert.throws(()=>validate({...state,complete:false}),/格式/);
 });
 test('reject a contradictory completion flag that would strand a player',()=>{assert.throws(()=>validate({...fresh(),hits:3,collected:[0,1,2],complete:false}),/格式/);});
+
+test('the entire journey unlocks in order and survives a full save round trip',async()=>{
+ const {chapters,isUnlocked,memoryCount}=await import('./chapters.js');
+ let s={...fresh(),complete:true,hits:3,collected:[0,1,2],garden:{step:4,adult:true,ring:[0,1,2,3],thin:[0,1,2],prune:[0,1],observed:true}};
+ for(const c of chapters.filter(c=>c.id>=3)){
+  assert.equal(isUnlocked(s,c.id),true);s.chapter=c.id;s.journey[c.id]=c.tasks.length;
+  if(c.id===10)s.collage=chapters.map(c=>c.id);s=validate(JSON.parse(JSON.stringify(s)));
+ }
+ assert.equal(memoryCount(s),10);assert.equal(s.chapter,10);
+ s.sketches.painting=[{color:2,points:[[0,0],[1000,1000]]}];s.profileText='在上海工作，也喜欢画画和养花。';assert.deepEqual(validate(JSON.parse(JSON.stringify(s))),s);
+});
+test('locked chapters, invalid brush coordinates and duplicate collage memories are rejected',()=>{
+ assert.throws(()=>validate({...fresh(),chapter:7}),/格式|旅程/);
+ assert.throws(()=>validate({...fresh(),journey:{3:1}}),/旅程/);
+ assert.throws(()=>validate({...fresh(),sketches:{jinci:[{color:0,points:[[1001,0]]}]}}),/笔触/);
+ assert.throws(()=>validate({...fresh(),collage:[1,1,null,null,null,null,null,null,null,null]}),/长卷/);
+});

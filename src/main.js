@@ -5,6 +5,8 @@ import {advanceWalk,walkFrame,walkBlend} from './walk-cycle.js';
 import {IdleMotion} from './idle-motion.js';
 import {atlasBlend} from './atlas-blend.js';
 import {createGarden} from './garden.js';
+import {createJourney} from './journey.js';
+import {chapters,chapterById,isComplete,isUnlocked,memoryCount} from './chapters.js';
 
 const $ = s => document.querySelector(s);
 const storage = {getItem: k => window.localStorage.getItem(k), setItem: (k,v) => window.localStorage.setItem(k,v)};
@@ -28,12 +30,21 @@ let background;
 try { background=await new THREE.TextureLoader().loadAsync(asset('village.png')); }
 catch { loading.innerHTML='画卷加载失败<small>请刷新页面重试。</small>'; throw Error('Background loading failed'); }
 background.colorSpace=THREE.SRGBColorSpace;const backdrop=plane(background,1600,900,800,450,0);
-let courtyard;
-async function applyScene(chapter){
- if(chapter===2&&!courtyard){courtyard=await new THREE.TextureLoader().loadAsync(asset('jujube-courtyard.png'));courtyard.colorSpace=THREE.SRGBColorSpace;}
- backdrop.material.map=chapter===2?courtyard:background;
+const sceneMaps=new Map([['village.png',background]]),sceneLoads=new Map();
+let currentSceneFile='village.png',sceneRequest=0;
+async function applyScene(chapter,phase=state.journey[chapter]){
+ const request=++sceneRequest;
+ const definition=chapterById(chapter);
+ const file=chapter===3&&(phase??0)===0?'village-road.webp':definition.image;
+ if(!sceneMaps.has(file)){
+  if(!sceneLoads.has(file))sceneLoads.set(file,new THREE.TextureLoader().loadAsync(asset(file)).then(map=>{map.colorSpace=THREE.SRGBColorSpace;sceneMaps.set(file,map);}).finally(()=>sceneLoads.delete(file)));
+  await sceneLoads.get(file);
+ }
+ if(request!==sceneRequest)return;
+ backdrop.material.map=sceneMaps.get(file);currentSceneFile=file;
+ while(sceneMaps.size>3){const expired=[...sceneMaps.keys()].find(key=>key!==file&&key!=='village.png');if(!expired)break;sceneMaps.get(expired).dispose();sceneMaps.delete(expired);}
 }
-if(state.chapter===2){try{await applyScene(2);}catch{loading.innerHTML='院里的画卷还没展开<small>请刷新页面重试，进度已经保留。</small>';throw Error('Courtyard loading failed');}}
+if(state.chapter!==1){try{await applyScene(state.chapter);}catch{loading.innerHTML='这一页还没展开<small>请刷新页面重试，进度已经保留。</small>';throw Error('Chapter loading failed');}}
 // Hand-painted animated silhouettes, rendered as independent Three.js planes.
 function womanTexture(step=0,striking=false){return texture(200,260,c=>{
  c.translate(100,235);c.fillStyle='#383b2960';c.beginPath();c.ellipse(1,5,38,7,0,0,Math.PI*2);c.fill();
@@ -57,14 +68,13 @@ async function loadAtlas(name,columns=4,rows=2,count=8){
 let paintedWoman,paintedWomanIdle,paintedDog,womanCycle,womanPhase=0;
 async function loadMotion(filename){
  const response=await fetch(asset(filename));if(!response.ok)throw Error('Motion not available');
- const meta=await response.json();const maps=await loadAtlas(meta.image,meta.columns,meta.rows,meta.frameCount);
- const idle=await new THREE.TextureLoader().loadAsync(asset(meta.idleImage));idle.colorSpace=THREE.SRGBColorSpace;
+ const meta=await response.json();const [maps,idle]=await Promise.all([loadAtlas(meta.image,meta.columns,meta.rows,meta.frameCount),new THREE.TextureLoader().loadAsync(asset(meta.idleImage))]);idle.colorSpace=THREE.SRGBColorSpace;
  return {meta,maps,idle};
 }
 let womanRest,womanIdleMotion;
 let lastIdleStart=-100;
 function idleGate(){if(time-lastIdleStart<3.2)return false;lastIdleStart=time;return true;}
-async function motionPool(names){const clips=[];for(const name of names){try{clips.push(await loadMotion(name+'-walk-video.json'));}catch{console.warn('Motion unavailable: '+name);}}return clips;}
+async function motionPool(names){return (await Promise.all(names.map(async name=>{try{return await loadMotion(name+'-walk-video.json');}catch{console.warn('Motion unavailable: '+name);return null;}}))).filter(Boolean);}
 try{
  const response=await fetch(asset('woman-walk-video.json'));if(!response.ok)throw Error('Video gait unavailable');
  womanCycle=await response.json();
@@ -94,6 +104,9 @@ const nuts=[1200,1330,1430].map((x,i)=>{const n=plane(walnutMap,24,24,x,0,6);n.u
 let seed=182;function random(){seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;}
 const leafMap=texture(40,20,c=>{c.fillStyle='#ac853ac0';c.beginPath();c.ellipse(20,10,17,5,-.25,0,7);c.fill();});
 const leaves=Array.from({length:20},()=>{const l=plane(leafMap,9+random()*10,7,random()*1600,random()*800,3);l.userData={speed:8+random()*14,phase:random()*7};return l;});
+const memoryWords=['核桃','枣树','月亮','车铃','火车','课桌','屋檐','灯','画','家'];
+const memoryTextures=memoryWords.map((word,i)=>{const map=texture(240,140,c=>{c.fillStyle='#efe5c9';c.fillRect(3,3,234,134);c.strokeStyle='#a89870';c.lineWidth=3;c.strokeRect(5,5,230,130);c.fillStyle='#526048';c.textAlign='center';c.font='36px SimSun,serif';c.fillText(word,120,82);c.font='17px sans-serif';c.fillText(String(i+1).padStart(2,'0'),120,116);});return map;});
+const memoryCards=memoryTextures.map((map,i)=>plane(map,100,58,100+i*145,460,2));
 const pathY=x=> 635+85*Math.sin(Math.PI*x/1600)+40*x/1600;
 function resize(){
  const {width:w,height:h}=$('#game').getBoundingClientRect();
@@ -111,42 +124,57 @@ function save(){const ok=write(storage,state);$('#save-status').textContent=ok?'
 function say(text,duration=5000){$('#subtitle').textContent=text;$('#subtitle').classList.add('visible');dialogueUntil=performance.now()+duration;}
 function chime(note=440){if(!soundEnabled)return;audio??=new AudioContext();audio.resume();const o=audio.createOscillator(),g=audio.createGain();o.type='sine';o.frequency.value=note;g.gain.setValueAtTime(0,audio.currentTime);g.gain.linearRampToValueAtTime(.045,audio.currentTime+.03);g.gain.exponentialRampToValueAtTime(.001,audio.currentTime+1.4);o.connect(g);g.connect(audio.destination);o.start();o.stop(audio.currentTime+1.5);}
 const garden=createGarden({dialog:$('#garden'),getState:()=>state,onChange:()=>{save();updateUI();},onComplete:()=>{save();updateUI();$('#garden-ending').showModal();}});
+const journey=createJourney({dialog:$('#journey'),getState:()=>state,onChange:()=>{save();updateUI();if(state.chapter===3&&currentSceneFile!=='school-moon.webp'&&state.journey[3]>0)applyScene(3).catch(()=>say('月色稍后再看，回忆已经保存。'));},onComplete:showChapterEnding,onStage:(id,index)=>{if(id===3){const desired=index===0?'village-road.webp':'school-moon.webp';if(currentSceneFile!==desired)applyScene(id,index).catch(()=>say('这一页的光线稍后再看，进度已经保留。'));}},onWalk:()=>{state.x=150;target=state.x;dogX=85;womanIdleMotion?.reset();dogIdleMotion?.reset();resize();save();say('她走进画里的路。再往右走，黑狗在尽头等她。',7000);}});
+function showChapterEnding(id){
+ save();updateUI();
+ if(id===10){$('#finale').showModal();return;}
+ const c=chapterById(id);$('#chapter-ending-number').textContent='拾起一页 · '+String(id).padStart(2,'0');$('#chapter-ending-title').textContent=c.title;$('#chapter-ending-quote').textContent=c.memory;
+ $('#chapter-next').textContent='下一程 · '+chapterById(id+1).title+' →';$('#chapter-next').onclick=()=>changeChapter(id+1);$('#chapter-ending').showModal();
+}
+const interactionX=()=>state.chapter===10&&state.journey[10]>=1?1480:1320;
 let changingScene=false;
 async function changeChapter(chapter){
- if(changingScene||(chapter===2&&!state.complete))return;
+ if(changingScene||!chapterById(chapter)||!isUnlocked(state,chapter))return;
  changingScene=true;keys.clear();$('#scene-loading').hidden=false;
  try{
   await applyScene(chapter);
   document.querySelectorAll('dialog[open]').forEach(d=>d.close());
-  state.chapter=chapter;state.x=chapter===2?900:1320;target=state.x;dogX=state.x-65;
+  state.chapter=chapter;state.x=chapter===1?1320:900;target=state.x;dogX=state.x-65;
   womanPhase=0;dogPhase=0;strikeAt=-100;womanIdleMotion?.reset();dogIdleMotion?.reset();
   active=true;state.started=true;document.body.classList.add('playing');resize();save();updateUI();
-  say(chapter===2?'院门还在。那把小凳子，也还在。':'老核桃树还在这里，黑狗也还陪着她。');
+  say(chapterById(chapter).intro,6500);
  }catch{say('这一页暂时没有加载好，稍后可以从手记再试一次。');}
  finally{$('#scene-loading').hidden=true;changingScene=false;}
 }
 function updateUI(){
- const inGarden=state.chapter===2,g=state.garden;
- $('#chapter .eyebrow').textContent=inGarden?'第二章 · 家里的院子':'第一章 · 故乡';
- $('#chapter h2').textContent=inGarden?'枣树下的光':'核桃落下来的时候';
- $('#progress').textContent=`记忆碎片 ${(state.complete?1:0)+(g.step===4?1:0)} / 2`;
- $('#objective').textContent=inGarden?(g.step===4?'这一页已收好。和黑狗在树影下歇一会儿。':`走到枣树下，慢慢照料 · ${g.step} / 4`):state.complete?'画册多了一页。从手记去院里的枣树下看看。':state.hits===0?'沿着小路，去看看那棵老核桃树。':state.hits<3?`轻轻敲打树枝 · ${state.hits} / 3`:`捡起落在小路上的核桃 · ${state.collected.length} / 3`;
+ const c=chapterById(state.chapter),g=state.garden,count=memoryCount(state);
+ $('#chapter .eyebrow').textContent=(state.chapter===10?'尾声':'第'+['','一','二','三','四','五','六','七','八','九'][state.chapter]+'章')+' · '+c.place;
+ $('#chapter h2').textContent=c.title;
+ $('#progress').textContent=`记忆碎片 ${count} / 10`;
+ $('#objective').textContent=state.chapter>=3?(state.chapter===10&&state.journey[10]===1?'沿画卷往右走，在尽头收好画册。':isComplete(state,c.id)?'这一页已收好。手记里可以往返走过的日子。':`往右走到记忆停留的地方 · ${state.journey[c.id]} / ${c.tasks.length}`):state.chapter===2?(g.step===4?'这一页已收好。从手记继续上学的路。':`走到枣树下，慢慢照料 · ${g.step} / 4`):state.complete?'画册多了一页。从手记继续下一程。':state.hits===0?'沿着小路，去看看那棵老核桃树。':state.hits<3?`轻轻敲打树枝 · ${state.hits} / 3`:`捡起落在小路上的核桃 · ${state.collected.length} / 3`;
  $('#memory-state').textContent=state.complete?'故乡 · 已拾起':'故乡 · 等待拾起';
- $('#memory-text').textContent=g.step===4?'“照料一棵树，要想着明年。”旧绳头和核桃，一起留在了画册里。':state.complete?'“留着明天吃。”她把一颗核桃留在了口袋里。':'画册还空着。去老树下看看吧。';
+ $('#memory-text').textContent=count===10?'十页回忆，还有你留下的笔触，都收在了画册里。':g.step===4?'“照料一棵树，要想着明年。”旧绳头和核桃，一起留在了画册里。':state.complete?'“留着明天吃。”她把一颗核桃留在了口袋里。':'画册还空着。去老树下看看吧。';
  $('#garden-memory-state').textContent=g.step===4?'院子 · 已拾起':state.complete?`已照料 ${g.step} / 4 段回忆`:'完成第一章后，沿小路去院里看看。';
- $('#visit-garden').disabled=!state.complete;
- $('#visit-garden').textContent=inGarden?'留在枣树下':'去枣树下';
- $('#visit-walnut').textContent=inGarden?'回到核桃树':'留在核桃树下';
+ $('#visit-garden').disabled=!state.complete;$('#visit-garden').textContent=state.chapter===2?'留在枣树下':'去枣树下';$('#visit-walnut').textContent=state.chapter===1?'留在核桃树下':'回到核桃树';
+ $('#journey-chapter-list').innerHTML=chapters.filter(c=>c.id>=3).map(c=>`<button data-visit="${c.id}" aria-current="${state.chapter===c.id}" ${isUnlocked(state,c.id)?'':'disabled'}><span>${String(c.id).padStart(2,'0')}</span><span>${c.title}<small>${isComplete(state,c.id)?'已拾起 · 可以重温':isUnlocked(state,c.id)?'已解锁 · '+state.journey[c.id]+' / '+c.tasks.length:'走完上一章后解锁'}</small></span></button>`).join('');
+ document.querySelectorAll('[data-visit]').forEach(b=>b.onclick=()=>state.chapter===Number(b.dataset.visit)?$('#book').close():changeChapter(Number(b.dataset.visit)));
+ $('#journey-summary').textContent=count===10?'全书已完成。回到任意一章，都能再走一会儿。':'沿着解锁的章节，一页一页往前走。';
 }
+$('#journey .journey-close').onclick=()=>$('#journey').close();
+$('#chapter-stay').onclick=()=>$('#chapter-ending').close();
+$('#to-school').onclick=()=>changeChapter(3);
+$('#finale-continue').onclick=()=>{$('#finale').close();say('走吧。天还亮着。');};
+$('#finale-journal').onclick=()=>{$('#finale').close();$('#book').showModal();};
 $('#garden .garden-close').onclick=()=>$('#garden').close();
 $('#garden-continue').onclick=()=>{$('#garden-ending').close();say('明年的树影，也会在这里。');};
 $('#to-garden').onclick=()=>changeChapter(2);
 $('#visit-garden').onclick=()=>state.chapter===2?$('#book').close():changeChapter(2);
 $('#visit-walnut').onclick=()=>state.chapter===1?$('#book').close():changeChapter(1);
 if(state.started){$('#start').innerHTML='继续旅程 <span>→</span>';$('#resume-note').textContent='上一次的脚步，已为你留下。';}updateUI();
-$('#start').onclick=()=>{active=true;state.started=true;document.body.classList.add('playing');save();say(state.chapter===2?'她推开院门，黑狗先跑进树影里。':state.complete?'黑狗还记得回家的路。':'好多年了。这棵树，倒还认得我。');};
+$('#start').onclick=()=>{active=true;state.started=true;document.body.classList.add('playing');save();say(chapterById(state.chapter).intro,6500);};
 function dialogOpen(){return Boolean(document.querySelector('dialog[open]'));}
 function interact(){if(!active||dialogOpen()||changingScene)return;womanIdleMotion?.reset();keys.clear();target=state.x;
+ if(state.chapter>=3){if(Math.abs(state.x-interactionX())<155)journey.open(state.chapter);return;}
  if(state.chapter===2){if(Math.abs(state.x-1320)<155)garden.open();return;}
  const near=nearestNut();
  if(near){state.collected.push(near.userData.i);chime(520+state.collected.length*90);say(['这一颗，滚得真远。','小时候，总嫌口袋不够大。','“留着明天吃。”'][state.collected.length-1]);if(state.collected.length===3){state.complete=true;save();$('#ending').showModal();} }
@@ -162,7 +190,7 @@ $('#journal').onclick=()=>{keys.clear();$('#book').showModal();};$('#book .close
 $('#continue').onclick=()=>{$('#ending').close();say('走吧。天还亮着。');};
 $('#sound').onclick=()=>{soundEnabled=!soundEnabled;$('#sound').textContent=`声音 · ${soundEnabled?'开':'关'}`;$('#sound').setAttribute('aria-label',soundEnabled?'关闭声音':'开启声音');chime(440);};
 $('#export').onclick=()=>{const url=URL.createObjectURL(new Blob([JSON.stringify(state,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='来时的路-存档.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
-$('#import').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{if(f.size>10000)throw Error('存档文件过大');const imported=validate(JSON.parse(await f.text()));await applyScene(imported.chapter);state=imported;target=state.x;dogX=state.x-65;womanIdleMotion?.reset();dogIdleMotion?.reset();resize();save();updateUI();$('#book').close();say('旧日的脚步，找回来了。');}catch(err){$('#memory-text').textContent=err.message;}e.target.value='';};
+$('#import').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{if(f.size>300000)throw Error('存档文件过大');const imported=validate(JSON.parse(await f.text()));await applyScene(imported.chapter);state=imported;target=state.x;dogX=state.x-65;womanIdleMotion?.reset();dogIdleMotion?.reset();resize();save();updateUI();$('#book').close();say('旧日的脚步，找回来了。');}catch(err){$('#memory-text').textContent=err.message;}e.target.value='';};
 $('#reset').onclick=async()=>{if(!confirm('重新启程会覆盖本浏览器的进度。需要的话，请先导出存档。'))return;await applyScene(1);state=fresh();state.started=true;target=state.x;dogX=state.x-65;for(const n of nuts){n.userData.landed=false;n.userData.fall=0;}active=true;document.body.classList.add('playing');womanIdleMotion?.reset();dogIdleMotion?.reset();resize();save();updateUI();$('#book').close();say('这一次，慢慢走。');};
 addEventListener('pagehide',save);document.addEventListener('visibilitychange',()=>{if(document.hidden){keys.clear();save();}});
 let previous=performance.now();
@@ -201,9 +229,10 @@ function frame(now){const dt=Math.min((now-previous)/1000,.05);previous=now;time
  if(dogRest.length&&dogIdle?.active){const clip=dogRest[dogIdle.clip];dog.position.y=pathY(dogX)-showMotion(dog,clip,clip.maps[dogIdle.frame]);}
  if(dogMoving)dog.scale.x=dogX<previousDogX?-1:1;
  nuts.forEach((n,i)=>{n.visible=state.chapter===1&&i<state.hits&&!state.collected.includes(i);if(n.visible){n.userData.fall=Math.min(1,n.userData.fall+dt*.8);n.userData.landed=n.userData.fall>=1;n.position.y=THREE.MathUtils.lerp(420,pathY(n.position.x)-5,n.userData.fall*n.userData.fall);n.rotation.z=n.userData.landed?Math.sin(time*2+i)*.06:time*3;}});
+ memoryCards.forEach((card,i)=>{card.material.map=memoryTextures[(state.collage[i]??(i+1))-1];card.visible=state.chapter===10&&state.journey[10]>=1;card.position.y=pathY(card.position.x)-200;});
  leaves.forEach(l=>{l.position.x-=dt*l.userData.speed;if(l.position.x<0)l.position.x=1600;l.position.y+=Math.sin(time*.7+l.userData.phase)*dt*5;l.rotation.z=Math.sin(time+l.userData.phase)*.5;});
- const near=nearestNut(),tree=(state.chapter===2||state.hits<3)&&Math.abs(state.x-1320)<155;
- $('#interact').hidden=paused||(!near&&!tree);if(!$('#interact').hidden)$('#interact').innerHTML=state.chapter===2?(state.garden.step===4?'翻看树下的回忆 <span>E</span>':'照料枣树 <span>E</span>'):near?'捡起核桃 <span>E</span>':'敲打核桃树 <span>E</span>';
+ const near=nearestNut(),tree=(state.chapter>=2||state.hits<3)&&Math.abs(state.x-interactionX())<155;
+ $('#interact').hidden=paused||(!near&&!tree);if(!$('#interact').hidden)$('#interact').innerHTML=state.chapter>=3?(state.chapter===10&&state.journey[10]>=1?'收好画册，回家 <span>E</span>':'走进这段回忆 <span>E</span>'):state.chapter===2?(state.garden.step===4?'翻看树下的回忆 <span>E</span>':'照料枣树 <span>E</span>'):near?'捡起核桃 <span>E</span>':'敲打核桃树 <span>E</span>';
  $('#subtitle').style.setProperty('--subtitle-offset',viewWidth<viewHeight?`${Math.max(110,viewportHeight-(pathY(state.x)-140-cameraTop)/viewHeight*viewportHeight+12)}px`:'110px');
  if(now>dialogueUntil)$('#subtitle').classList.remove('visible');renderer.render(scene,camera);
 }
