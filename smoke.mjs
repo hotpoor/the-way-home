@@ -11,7 +11,7 @@ for(let i=0;i<6;i++){const s=await page.evaluate(()=>JSON.parse(localStorage.get
 let previousTarget=1320;for(const x of [1200,1330,1430]){await page.mouse.click(x-160,735);await page.waitForTimeout(Math.ceil((Math.abs(x-previousTarget)+30)/speed*1000)+500);previousTarget=x;if(await page.locator('#interact').isVisible()){await page.locator('#interact').click();await page.waitForTimeout(150);}}
 await expect(page.locator('#ending')).toBeVisible();await page.screenshot({path:'test-results/ending.png'});await page.locator('#continue').click();
 const saved=await page.evaluate(()=>JSON.parse(localStorage.getItem('the-way-home.save.v1')));if(!saved.complete||saved.collected.length!==3)throw Error('chapter not saved');
-await page.reload();await page.waitForSelector('.loading',{state:'detached'});await expect(page.locator('#start')).toContainText('继续旅程');await page.locator('#start').click();await expect(page.locator('#progress')).toContainText('1 / 1');
-await page.locator('#journal').click();await expect(page.locator('#memory-state')).toContainText('已拾起');await page.locator('.close').click();
+await page.reload();await page.waitForSelector('.loading',{state:'detached'});await expect(page.locator('#start')).toContainText('继续旅程');await page.locator('#start').click();await expect(page.locator('#progress')).toContainText('1 / 2');
+await page.locator('#journal').click();await expect(page.locator('#memory-state')).toContainText('已拾起');await page.locator('#book .close').click();
 await page.setViewportSize({width:390,height:844});await page.waitForTimeout(600);await page.screenshot({path:'test-results/mobile.png'});
 if(errors.length)throw Error(errors.join('\n'));console.log('PASS: playable chapter, three walnuts, completion, reload persistence, journal, mobile viewport; no page errors');await browser.close();

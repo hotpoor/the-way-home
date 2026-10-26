@@ -8,6 +8,6 @@ for(const [w,h,touch] of [[320,568,true],[390,844,true],[844,390,true],[667,375,
  await inside('#start');await p.locator('#start').click();await expect(p.locator('#interact')).toBeVisible();await p.waitForTimeout(700);
  for(const s of ['header','#chapter','#interact','#subtitle'])await inside(s);
  if(touch){await expect(p.locator('#touch')).toBeVisible();await inside('#touch');const a=await p.locator('#touch').boundingBox(),c=await p.locator('#interact').boundingBox();if(a.x+a.width>c.x)throw Error('control overlap');}
- await p.screenshot({path:`test-results/fit-${w}x${h}.png`});await p.locator('#journal').click();await inside('#book');await p.locator('#reset').scrollIntoViewIfNeeded();await inside('#reset');await p.locator('.close').click();
+ await p.screenshot({path:`test-results/fit-${w}x${h}.png`});await p.locator('#journal').click();await inside('#book');await p.locator('#reset').scrollIntoViewIfNeeded();await inside('#reset');await p.locator('#book .close').click();
  await p.setViewportSize({width:h,height:w});await p.waitForTimeout(200);for(const s of ['header','#chapter','#interact'])await inside(s);if(touch)await inside('#touch');if(errors.length)throw Error(errors.join('\n'));console.log('PASS',w,h,touch?'touch':'mouse');await p.close();
 }await b.close();

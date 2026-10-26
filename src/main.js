@@ -4,6 +4,7 @@ import {fresh, read, write, validate} from './save.js';
 import {advanceWalk,walkFrame,walkBlend} from './walk-cycle.js';
 import {IdleMotion} from './idle-motion.js';
 import {atlasBlend} from './atlas-blend.js';
+import {createGarden} from './garden.js';
 
 const $ = s => document.querySelector(s);
 const storage = {getItem: k => window.localStorage.getItem(k), setItem: (k,v) => window.localStorage.setItem(k,v)};
@@ -26,7 +27,13 @@ const asset = n => `${import.meta.env.BASE_URL}assets/${n}`;
 let background;
 try { background=await new THREE.TextureLoader().loadAsync(asset('village.png')); }
 catch { loading.innerHTML='画卷加载失败<small>请刷新页面重试。</small>'; throw Error('Background loading failed'); }
-background.colorSpace=THREE.SRGBColorSpace; plane(background,1600,900,800,450,0);
+background.colorSpace=THREE.SRGBColorSpace;const backdrop=plane(background,1600,900,800,450,0);
+let courtyard;
+async function applyScene(chapter){
+ if(chapter===2&&!courtyard){courtyard=await new THREE.TextureLoader().loadAsync(asset('jujube-courtyard.png'));courtyard.colorSpace=THREE.SRGBColorSpace;}
+ backdrop.material.map=chapter===2?courtyard:background;
+}
+if(state.chapter===2){try{await applyScene(2);}catch{loading.innerHTML='院里的画卷还没展开<small>请刷新页面重试，进度已经保留。</small>';throw Error('Courtyard loading failed');}}
 // Hand-painted animated silhouettes, rendered as independent Three.js planes.
 function womanTexture(step=0,striking=false){return texture(200,260,c=>{
  c.translate(100,235);c.fillStyle='#383b2960';c.beginPath();c.ellipse(1,5,38,7,0,0,Math.PI*2);c.fill();
@@ -103,34 +110,63 @@ if(document.fullscreenEnabled){$('#fullscreen').hidden=false;$('#fullscreen').on
 function save(){const ok=write(storage,state);$('#save-status').textContent=ok?'已存档 · 此浏览器':'无法保存 · 请从手记导出存档';}
 function say(text,duration=5000){$('#subtitle').textContent=text;$('#subtitle').classList.add('visible');dialogueUntil=performance.now()+duration;}
 function chime(note=440){if(!soundEnabled)return;audio??=new AudioContext();audio.resume();const o=audio.createOscillator(),g=audio.createGain();o.type='sine';o.frequency.value=note;g.gain.setValueAtTime(0,audio.currentTime);g.gain.linearRampToValueAtTime(.045,audio.currentTime+.03);g.gain.exponentialRampToValueAtTime(.001,audio.currentTime+1.4);o.connect(g);g.connect(audio.destination);o.start();o.stop(audio.currentTime+1.5);}
-function updateUI(){
- $('#progress').textContent=`记忆碎片 ${state.complete?1:0} / 1`;
- $('#objective').textContent=state.complete?'画册多了一页。和黑狗再散一会儿步吧。':state.hits===0?'沿着小路，去看看那棵老核桃树。':state.hits<3?`轻轻敲打树枝 · ${state.hits} / 3`:`捡起落在小路上的核桃 · ${state.collected.length} / 3`;
- $('#memory-state').textContent=state.complete?'故乡 · 已拾起':'故乡 · 等待拾起';
- $('#memory-text').textContent=state.complete?'“留着明天吃。”她把一颗核桃留在了口袋里。':'画册还空着。去老树下看看吧。';
+const garden=createGarden({dialog:$('#garden'),getState:()=>state,onChange:()=>{save();updateUI();},onComplete:()=>{save();updateUI();$('#garden-ending').showModal();}});
+let changingScene=false;
+async function changeChapter(chapter){
+ if(changingScene||(chapter===2&&!state.complete))return;
+ changingScene=true;keys.clear();$('#scene-loading').hidden=false;
+ try{
+  await applyScene(chapter);
+  document.querySelectorAll('dialog[open]').forEach(d=>d.close());
+  state.chapter=chapter;state.x=chapter===2?900:1320;target=state.x;dogX=state.x-65;
+  womanPhase=0;dogPhase=0;strikeAt=-100;womanIdleMotion?.reset();dogIdleMotion?.reset();
+  active=true;state.started=true;document.body.classList.add('playing');resize();save();updateUI();
+  say(chapter===2?'院门还在。那把小凳子，也还在。':'老核桃树还在这里，黑狗也还陪着她。');
+ }catch{say('这一页暂时没有加载好，稍后可以从手记再试一次。');}
+ finally{$('#scene-loading').hidden=true;changingScene=false;}
 }
+function updateUI(){
+ const inGarden=state.chapter===2,g=state.garden;
+ $('#chapter .eyebrow').textContent=inGarden?'第二章 · 家里的院子':'第一章 · 故乡';
+ $('#chapter h2').textContent=inGarden?'枣树下的光':'核桃落下来的时候';
+ $('#progress').textContent=`记忆碎片 ${(state.complete?1:0)+(g.step===4?1:0)} / 2`;
+ $('#objective').textContent=inGarden?(g.step===4?'这一页已收好。和黑狗在树影下歇一会儿。':`走到枣树下，慢慢照料 · ${g.step} / 4`):state.complete?'画册多了一页。从手记去院里的枣树下看看。':state.hits===0?'沿着小路，去看看那棵老核桃树。':state.hits<3?`轻轻敲打树枝 · ${state.hits} / 3`:`捡起落在小路上的核桃 · ${state.collected.length} / 3`;
+ $('#memory-state').textContent=state.complete?'故乡 · 已拾起':'故乡 · 等待拾起';
+ $('#memory-text').textContent=g.step===4?'“照料一棵树，要想着明年。”旧绳头和核桃，一起留在了画册里。':state.complete?'“留着明天吃。”她把一颗核桃留在了口袋里。':'画册还空着。去老树下看看吧。';
+ $('#garden-memory-state').textContent=g.step===4?'院子 · 已拾起':state.complete?`已照料 ${g.step} / 4 段回忆`:'完成第一章后，沿小路去院里看看。';
+ $('#visit-garden').disabled=!state.complete;
+ $('#visit-garden').textContent=inGarden?'留在枣树下':'去枣树下';
+ $('#visit-walnut').textContent=inGarden?'回到核桃树':'留在核桃树下';
+}
+$('#garden .garden-close').onclick=()=>$('#garden').close();
+$('#garden-continue').onclick=()=>{$('#garden-ending').close();say('明年的树影，也会在这里。');};
+$('#to-garden').onclick=()=>changeChapter(2);
+$('#visit-garden').onclick=()=>state.chapter===2?$('#book').close():changeChapter(2);
+$('#visit-walnut').onclick=()=>state.chapter===1?$('#book').close():changeChapter(1);
 if(state.started){$('#start').innerHTML='继续旅程 <span>→</span>';$('#resume-note').textContent='上一次的脚步，已为你留下。';}updateUI();
-$('#start').onclick=()=>{active=true;state.started=true;document.body.classList.add('playing');save();say(state.complete?'黑狗还记得回家的路。':'好多年了。这棵树，倒还认得我。');};
+$('#start').onclick=()=>{active=true;state.started=true;document.body.classList.add('playing');save();say(state.chapter===2?'她推开院门，黑狗先跑进树影里。':state.complete?'黑狗还记得回家的路。':'好多年了。这棵树，倒还认得我。');};
 function dialogOpen(){return Boolean(document.querySelector('dialog[open]'));}
-function interact(){if(!active||dialogOpen())return;womanIdleMotion?.reset();const near=nearestNut();
+function interact(){if(!active||dialogOpen()||changingScene)return;womanIdleMotion?.reset();keys.clear();target=state.x;
+ if(state.chapter===2){if(Math.abs(state.x-1320)<155)garden.open();return;}
+ const near=nearestNut();
  if(near){state.collected.push(near.userData.i);chime(520+state.collected.length*90);say(['这一颗，滚得真远。','小时候，总嫌口袋不够大。','“留着明天吃。”'][state.collected.length-1]);if(state.collected.length===3){state.complete=true;save();$('#ending').showModal();} }
  else if(state.hits<3&&Math.abs(state.x-1320)<155&&time-strikeAt>1){strikeAt=time;state.hits++;chime(210+state.hits*40);say(['“你站远点，我要打了。”','她握稳长杆，轻轻敲了敲树枝。','树梢摇晃。像有人在上面笑。'][state.hits-1]);}
  updateUI();save();}
-function nearestNut(){return nuts.find(n=>n.visible&&n.userData.landed&&Math.abs(n.position.x-state.x)<55);}
+function nearestNut(){if(state.chapter!==1)return;return nuts.find(n=>n.visible&&n.userData.landed&&Math.abs(n.position.x-state.x)<55);}
 $('#interact').onclick=interact;
 renderer.domElement.addEventListener('pointerdown',e=>{if(!active||dialogOpen())return;target=THREE.MathUtils.clamp(cameraLeft+(e.clientX-renderer.domElement.getBoundingClientRect().left)/renderer.domElement.clientWidth*viewWidth,70,1510);});
 addEventListener('keydown',e=>{if(dialogOpen())return;if(['ArrowLeft','ArrowRight','a','d','A','D','e','E',' '].includes(e.key)){e.preventDefault();keys.add(e.key.toLowerCase());if(!e.repeat&&['e','E',' '].includes(e.key))interact();}});
 addEventListener('keyup',e=>{keys.delete(e.key.toLowerCase());});addEventListener('blur',()=>keys.clear());
 for(const [id,key] of [['left','arrowleft'],['right','arrowright']]){const b=$('#'+id);b.onpointerdown=e=>{b.setPointerCapture(e.pointerId);keys.add(key);};b.onpointerup=b.onpointercancel=()=>keys.delete(key);}
-$('#journal').onclick=()=>{keys.clear();$('#book').showModal();};$('.close').onclick=()=>$('#book').close();
+$('#journal').onclick=()=>{keys.clear();$('#book').showModal();};$('#book .close').onclick=()=>$('#book').close();
 $('#continue').onclick=()=>{$('#ending').close();say('走吧。天还亮着。');};
 $('#sound').onclick=()=>{soundEnabled=!soundEnabled;$('#sound').textContent=`声音 · ${soundEnabled?'开':'关'}`;$('#sound').setAttribute('aria-label',soundEnabled?'关闭声音':'开启声音');chime(440);};
 $('#export').onclick=()=>{const url=URL.createObjectURL(new Blob([JSON.stringify(state,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='来时的路-存档.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
-$('#import').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{if(f.size>10000)throw Error('存档文件过大');state=validate(JSON.parse(await f.text()));target=state.x;dogX=state.x-65;save();updateUI();$('#book').close();say('旧日的脚步，找回来了。');}catch(err){$('#memory-text').textContent=err.message;}e.target.value='';};
-$('#reset').onclick=()=>{if(!confirm('重新启程会覆盖本浏览器的进度。需要的话，请先导出存档。'))return;state=fresh();state.started=true;target=state.x;dogX=state.x-65;for(const n of nuts){n.userData.landed=false;n.userData.fall=0;}active=true;document.body.classList.add('playing');save();updateUI();$('#book').close();say('这一次，慢慢走。');};
+$('#import').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{if(f.size>10000)throw Error('存档文件过大');const imported=validate(JSON.parse(await f.text()));await applyScene(imported.chapter);state=imported;target=state.x;dogX=state.x-65;womanIdleMotion?.reset();dogIdleMotion?.reset();resize();save();updateUI();$('#book').close();say('旧日的脚步，找回来了。');}catch(err){$('#memory-text').textContent=err.message;}e.target.value='';};
+$('#reset').onclick=async()=>{if(!confirm('重新启程会覆盖本浏览器的进度。需要的话，请先导出存档。'))return;await applyScene(1);state=fresh();state.started=true;target=state.x;dogX=state.x-65;for(const n of nuts){n.userData.landed=false;n.userData.fall=0;}active=true;document.body.classList.add('playing');womanIdleMotion?.reset();dogIdleMotion?.reset();resize();save();updateUI();$('#book').close();say('这一次，慢慢走。');};
 addEventListener('pagehide',save);document.addEventListener('visibilitychange',()=>{if(document.hidden){keys.clear();save();}});
 let previous=performance.now();
-function frame(now){const dt=Math.min((now-previous)/1000,.05);previous=now;time+=dt;const paused=!active||dialogOpen()||document.hidden;
+function frame(now){const dt=Math.min((now-previous)/1000,.05);previous=now;time+=dt;const paused=!active||dialogOpen()||document.hidden||changingScene;
  const previousX=state.x;
  const dir=(keys.has('d')||keys.has('arrowright')?1:0)-(keys.has('a')||keys.has('arrowleft')?1:0);
  const womanIdle=womanIdleMotion?.update(dt,Boolean(dir)||Math.abs(target-state.x)>.2,paused);
@@ -144,7 +180,7 @@ function frame(now){const dt=Math.min((now-previous)/1000,.05);previous=now;time
  woman.material.map=paintedWomanIdle&&!moving?paintedWomanIdle:paintedWoman?paintedWoman[womanIndex]:(time-strikeAt<.65?strikeFrame:frames[moving?Math.floor(time*9)%8:0]);
  if(womanRest.length&&!moving){const clip=womanIdle?.active?womanRest[womanIdle.clip]:womanRest[0];const offset=showMotion(woman,clip,womanIdle?.active?clip.maps[womanIdle.frame]:clip.idle);woman.position.y=pathY(state.x)-offset;}
  else if(womanCycle){showMotion(woman,{meta:womanCycle},woman.material.map);}
- pole.visible=active&&time-strikeAt<.65;pole.position.set(state.x+29,pathY(state.x)-144,5);pole.rotation.z=Math.sin((time-strikeAt)*Math.PI/.65)*-.2;
+ pole.visible=active&&state.chapter===1&&time-strikeAt<.65;pole.position.set(state.x+29,pathY(state.x)-144,5);pole.rotation.z=Math.sin((time-strikeAt)*Math.PI/.65)*-.2;
  const facing=state.x<previousX-.0001?-1:state.x>previousX+.0001?1:Math.sign(woman.scale.x);woman.scale.x=facing;
  const dogTarget=Math.max(55,state.x-65),previousDogX=dogX;
  const dogIdle=dogIdleMotion?.update(dt,Math.abs(dogTarget-dogX)>.08||moving,paused);
@@ -164,10 +200,10 @@ function frame(now){const dt=Math.min((now-previous)/1000,.05);previous=now;time
  else dog.material.map=(paintedDog||dogFrames)[dogMoving?Math.floor(time*10)%8:0];
  if(dogRest.length&&dogIdle?.active){const clip=dogRest[dogIdle.clip];dog.position.y=pathY(dogX)-showMotion(dog,clip,clip.maps[dogIdle.frame]);}
  if(dogMoving)dog.scale.x=dogX<previousDogX?-1:1;
- nuts.forEach((n,i)=>{n.visible=i<state.hits&&!state.collected.includes(i);if(n.visible){n.userData.fall=Math.min(1,n.userData.fall+dt*.8);n.userData.landed=n.userData.fall>=1;n.position.y=THREE.MathUtils.lerp(420,pathY(n.position.x)-5,n.userData.fall*n.userData.fall);n.rotation.z=n.userData.landed?Math.sin(time*2+i)*.06:time*3;}});
+ nuts.forEach((n,i)=>{n.visible=state.chapter===1&&i<state.hits&&!state.collected.includes(i);if(n.visible){n.userData.fall=Math.min(1,n.userData.fall+dt*.8);n.userData.landed=n.userData.fall>=1;n.position.y=THREE.MathUtils.lerp(420,pathY(n.position.x)-5,n.userData.fall*n.userData.fall);n.rotation.z=n.userData.landed?Math.sin(time*2+i)*.06:time*3;}});
  leaves.forEach(l=>{l.position.x-=dt*l.userData.speed;if(l.position.x<0)l.position.x=1600;l.position.y+=Math.sin(time*.7+l.userData.phase)*dt*5;l.rotation.z=Math.sin(time+l.userData.phase)*.5;});
- const near=nearestNut(),tree=state.hits<3&&Math.abs(state.x-1320)<155;
- $('#interact').hidden=paused||(!near&&!tree);if(!$('#interact').hidden)$('#interact').innerHTML=near?'捡起核桃 <span>E</span>':'敲打核桃树 <span>E</span>';
+ const near=nearestNut(),tree=(state.chapter===2||state.hits<3)&&Math.abs(state.x-1320)<155;
+ $('#interact').hidden=paused||(!near&&!tree);if(!$('#interact').hidden)$('#interact').innerHTML=state.chapter===2?(state.garden.step===4?'翻看树下的回忆 <span>E</span>':'照料枣树 <span>E</span>'):near?'捡起核桃 <span>E</span>':'敲打核桃树 <span>E</span>';
  $('#subtitle').style.setProperty('--subtitle-offset',viewWidth<viewHeight?`${Math.max(110,viewportHeight-(pathY(state.x)-140-cameraTop)/viewHeight*viewportHeight+12)}px`:'110px');
  if(now>dialogueUntil)$('#subtitle').classList.remove('visible');renderer.render(scene,camera);
 }

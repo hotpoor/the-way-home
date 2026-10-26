@@ -66,3 +66,20 @@
 `scripts/smooth-gait.py public/assets/dog-walk-video.json public/assets/dog-walk-smooth.png` 可复现，依赖 OpenCV、NumPy、Pillow；本机通用 Python 已有依赖，未修改 ComfyUI 推理环境。元数据保留输入信息，重复执行仍使用原图集。
 
 运行时对相邻光流帧按距离相位混合，在预乘 alpha 空间处理透明轮廓，降低硬切与暗边。待机恢复普通采样。相同 80 个采样时刻、单周期、288×192 中性背景 GPU 对比中，帧间 RGB 平均绝对差的最大值从 8.73 降到 2.49，约下降 71%；这是画面差分指标，不代表用户主观评分。高倍放大仍可能看到光流的局部软化，原视频毛发的细微变化并未完全消除。
+
+
+## 第二章院落与护理画册
+
+`public/assets/jujube-courtyard.png` 使用内置 imagegen 工具，以当前 `village.png` 作为风格参考生成。人物继续使用现有连续视频素材，未生成独立新姿势。护理页的分枝、果实和点击示意为 SVG，提供清晰的鼠标、触摸和键盘目标。
+
+最终场景提示词：
+
+> Create a NEW background painting for chapter 2 of this exact painterly storybook game, matching the reference's textured gouache, warm paper, golden light and muted olive greens. Wide landscape 16:9. Chinese Loess Plateau village courtyard, intimate quiet rural family garden, distant grey green hills and simple clay plaster courtyard wall with old wooden gate. A mature JUJUBE tree with a slender gnarled trunk, small oval leaves and small reddish brown jujube fruits occupies the RIGHT third, trunk centered at x=1250 of a 1600-wide world. Crown upper right between x=850 and1550, visible distinct branches. A woven basket and low stool under the tree, small potted plants by wall, warm sunlight through canopy. Clear gently curving walkable dusty path across the entire image from left at y=635/900 to right at y=660/900, dipping to y=700 in middle. Foreground grasses below path. Upper LEFT third keep pale open wall and sky without busy details for game's text overlays. Plenty of room for characters to walk, same side-on camera height as reference. Quiet tender remembered childhood afternoon. No humans or animals, no text, no UI, no border, no photorealism, no 3D, no European red-roof villas. This is a clean empty environment; the game renders elderly woman and black dog independently.
+
+园艺依据：
+
+- [第二师铁门关市田间课堂，2026-06-12](https://www.tmg.gov.cn/qczl/37t/tcxx/203093.htm)：先确认成年与健壮树势，弱树和幼树不作为环剥对象。游戏只画出位置示意，不复制刀口与操作参数。
+- [湖南省林业局：枣树栽培技术](https://lyj.hunan.gov.cn/lyj/tslm_71206/ctpf/zpjs/201512/t20151227_2587180.html)：观察并选择枯弱、交叉重叠、病虫枝等疏剪对象。
+- [湖南省林业局：枣树夏季怎样管](https://lyj.hunan.gov.cn/tslm_71206/lykp/syjs/201512/t20151227_2615023.html)：疏果与改善通风透光。仅采用这些原则；未采用页面的历史药剂和剂量。
+
+异常簇生只是观察线索，游戏不凭单一外观断言病名，也不描写立刻治愈；叙事落点是记录、请人确认、持续照料。
