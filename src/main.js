@@ -8,6 +8,7 @@ import {createGarden} from './garden.js';
 import {propUrl} from './props.js';
 import {createJourney} from './journey.js';
 import {chapters,chapterById,isComplete,isUnlocked,memoryCount} from './chapters.js';
+import {scenePlacement} from './scene-layout.js';
 
 const $ = s => document.querySelector(s);
 const storage = {getItem: k => window.localStorage.getItem(k), setItem: (k,v) => window.localStorage.setItem(k,v)};
@@ -86,7 +87,8 @@ try{
 womanRest=await motionPool(['woman-hair','woman-look']);
 if(womanRest.length)womanIdleMotion=new IdleMotion(womanRest.map(c=>c.meta),{delay:5,cooldown:14,jitter:11,exitSeconds:1.2,exitRate:3,gate:idleGate});
 const dogFrames=Array.from({length:8},(_,i)=>texture(160,110,c=>{const a=i*Math.PI/4;c.fillStyle='#383b293c';c.beginPath();c.ellipse(78,96,55,6,0,0,7);c.fill();c.strokeStyle='#252a24';c.lineWidth=7;c.lineCap='round';for(let j=0;j<4;j++){const x=47+j*17;c.beginPath();c.moveTo(x,68);c.lineTo(x+Math.sin(a+j)*8,94);c.stroke();}c.fillStyle='#242a25';c.beginPath();c.ellipse(75,62,40,20,0,0,7);c.fill();c.beginPath();c.ellipse(112,42,18,21,-.4,0,7);c.fill();c.beginPath();c.ellipse(128,46,19,8,-.1,0,7);c.fill();c.beginPath();c.ellipse(104,49,8,19,-.4,0,7);c.fill();c.strokeStyle='#242a25';c.lineWidth=8;c.beginPath();c.moveTo(39,58);c.quadraticCurveTo(9,46,17,27+Math.sin(a)*5);c.stroke();c.fillStyle='#a99a73';c.fillRect(114,36,2,2);}));
-const dog=plane(dogFrames[0],80,55,state.x-65,0,5);let dogX=state.x-65;
+function companionX(x){return Math.max(55,x-65*scenePlacement(currentSceneFile,x).scale);}
+const dog=plane(dogFrames[0],80,55,companionX(state.x),0,5);let dogX=companionX(state.x);
 const dogBlend=atlasBlend(dog.material);
 let dogCycle,dogRest,dogIdleMotion,dogPhase=0;
 try{dogCycle=await loadMotion('dog-walk-video.json');paintedDog=dogCycle.maps;}catch{try{paintedDog=await loadAtlas('dog-walk.png');}catch{console.warn('Using fallback dog animation');}}
@@ -108,13 +110,17 @@ const leaves=Array.from({length:20},()=>{const l=plane(leafMap,9+random()*10,7,r
 const memoryWords=['核桃','枣树','月亮','车铃','火车','课桌','屋檐','灯','画','家'];
 const memoryTextures=memoryWords.map((word,i)=>{const map=texture(240,140,c=>{c.fillStyle='#efe5c9';c.fillRect(3,3,234,134);c.strokeStyle='#a89870';c.lineWidth=3;c.strokeRect(5,5,230,130);c.fillStyle='#526048';c.textAlign='center';c.font='36px SimSun,serif';c.fillText(word,120,82);c.font='17px sans-serif';c.fillText(String(i+1).padStart(2,'0'),120,116);});return map;});
 const memoryCards=memoryTextures.map((map,i)=>plane(map,100,58,100+i*145,460,2));
-const pathY=x=> 635+85*Math.sin(Math.PI*x/1600)+40*x/1600;
+const placement=x=>scenePlacement(currentSceneFile,x);
+const pathY=x=>placement(x).ground;
+const constrainX=x=>THREE.MathUtils.clamp(x,Math.max(70,112*placement(0).scale),1510);
+const cameraFocus=()=>viewWidth<700?Math.min(.66,.4+.18*(placement(state.x).scale-1)):.4;
 function resize(){
  const {width:w,height:h}=$('#game').getBoundingClientRect();
  viewportHeight=h;renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(w,h);
+ const bounded=constrainX(state.x);if(bounded!==state.x){state.x=bounded;dogX=companionX(state.x);}
  viewWidth=Math.min(1600,900*w/h);viewHeight=viewWidth*h/w;
  camera.right=viewWidth;camera.bottom=viewHeight;camera.updateProjectionMatrix();
- cameraLeft=THREE.MathUtils.clamp(state.x-viewWidth*.4,0,Math.max(0,1600-viewWidth));
+ cameraLeft=THREE.MathUtils.clamp(state.x-viewWidth*cameraFocus(),0,Math.max(0,1600-viewWidth));
  cameraTop=THREE.MathUtils.clamp(pathY(state.x)-viewHeight*.78,0,900-viewHeight);
  camera.position.set(cameraLeft,cameraTop,20);keys.clear();target=state.x;
 }
@@ -125,7 +131,7 @@ function save(){const ok=write(storage,state);$('#save-status').textContent=ok?'
 function say(text,duration=5000){$('#subtitle').textContent=text;$('#subtitle').classList.add('visible');dialogueUntil=performance.now()+duration;}
 function chime(note=440){if(!soundEnabled)return;audio??=new AudioContext();audio.resume();const o=audio.createOscillator(),g=audio.createGain();o.type='sine';o.frequency.value=note;g.gain.setValueAtTime(0,audio.currentTime);g.gain.linearRampToValueAtTime(.045,audio.currentTime+.03);g.gain.exponentialRampToValueAtTime(.001,audio.currentTime+1.4);o.connect(g);g.connect(audio.destination);o.start();o.stop(audio.currentTime+1.5);}
 const garden=createGarden({dialog:$('#garden'),getState:()=>state,onChange:()=>{save();updateUI();},onComplete:()=>{save();updateUI();$('#garden-ending').showModal();}});
-const journey=createJourney({dialog:$('#journey'),getState:()=>state,onChange:()=>{save();updateUI();if(state.chapter===3&&currentSceneFile!=='school-moon.webp'&&state.journey[3]>0)applyScene(3).catch(()=>say('月色稍后再看，回忆已经保存。'));},onComplete:showChapterEnding,onStage:(id,index)=>{if(id===3){const desired=index===0?'village-road.webp':'school-moon.webp';if(currentSceneFile!==desired)applyScene(id,index).catch(()=>say('这一页的光线稍后再看，进度已经保留。'));}},onWalk:()=>{state.x=150;target=state.x;dogX=85;womanIdleMotion?.reset();dogIdleMotion?.reset();resize();save();say('她走进画里的路。再往右走，黑狗在尽头等她。',7000);}});
+const journey=createJourney({dialog:$('#journey'),getState:()=>state,onChange:()=>{save();updateUI();if(state.chapter===3&&currentSceneFile!=='school-moon.webp'&&state.journey[3]>0)applyScene(3).catch(()=>say('月色稍后再看，回忆已经保存。'));},onComplete:showChapterEnding,onStage:(id,index)=>{if(id===3){const desired=index===0?'village-road.webp':'school-moon.webp';if(currentSceneFile!==desired)applyScene(id,index).catch(()=>say('这一页的光线稍后再看，进度已经保留。'));}},onWalk:()=>{state.x=150;target=state.x;dogX=companionX(state.x);womanIdleMotion?.reset();dogIdleMotion?.reset();resize();save();say('她走进画里的路。再往右走，黑狗在尽头等她。',7000);}});
 function showChapterEnding(id){
  save();updateUI();
  if(id===10){$('#finale').showModal();return;}
@@ -140,7 +146,7 @@ async function changeChapter(chapter){
  try{
   await applyScene(chapter);
   document.querySelectorAll('dialog[open]').forEach(d=>d.close());
-  state.chapter=chapter;state.x=chapter===1?1320:900;target=state.x;dogX=state.x-65;
+  state.chapter=chapter;state.x=chapter===1?1320:900;target=state.x;dogX=companionX(state.x);
   womanPhase=0;dogPhase=0;strikeAt=-100;womanIdleMotion?.reset();dogIdleMotion?.reset();
   active=true;state.started=true;document.body.classList.add('playing');resize();save();updateUI();
   say(chapterById(chapter).intro,6500);
@@ -183,7 +189,7 @@ function interact(){if(!active||dialogOpen()||changingScene)return;womanIdleMoti
  updateUI();save();}
 function nearestNut(){if(state.chapter!==1)return;return nuts.find(n=>n.visible&&n.userData.landed&&Math.abs(n.position.x-state.x)<55);}
 $('#interact').onclick=interact;
-renderer.domElement.addEventListener('pointerdown',e=>{if(!active||dialogOpen())return;target=THREE.MathUtils.clamp(cameraLeft+(e.clientX-renderer.domElement.getBoundingClientRect().left)/renderer.domElement.clientWidth*viewWidth,70,1510);});
+renderer.domElement.addEventListener('pointerdown',e=>{if(!active||dialogOpen())return;target=constrainX(cameraLeft+(e.clientX-renderer.domElement.getBoundingClientRect().left)/renderer.domElement.clientWidth*viewWidth);});
 addEventListener('keydown',e=>{if(dialogOpen())return;if(['ArrowLeft','ArrowRight','a','d','A','D','e','E',' '].includes(e.key)){e.preventDefault();keys.add(e.key.toLowerCase());if(!e.repeat&&['e','E',' '].includes(e.key))interact();}});
 addEventListener('keyup',e=>{keys.delete(e.key.toLowerCase());});addEventListener('blur',()=>keys.clear());
 for(const [id,key] of [['left','arrowleft'],['right','arrowright']]){const b=$('#'+id);b.onpointerdown=e=>{b.setPointerCapture(e.pointerId);keys.add(key);};b.onpointerup=b.onpointercancel=()=>keys.delete(key);}
@@ -191,50 +197,52 @@ $('#journal').onclick=()=>{keys.clear();$('#book').showModal();};$('#book .close
 $('#continue').onclick=()=>{$('#ending').close();say('走吧。天还亮着。');};
 $('#sound').onclick=()=>{soundEnabled=!soundEnabled;$('#sound').textContent=`声音 · ${soundEnabled?'开':'关'}`;$('#sound').setAttribute('aria-label',soundEnabled?'关闭声音':'开启声音');chime(440);};
 $('#export').onclick=()=>{const url=URL.createObjectURL(new Blob([JSON.stringify(state,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='来时的路-存档.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
-$('#import').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{if(f.size>300000)throw Error('存档文件过大');const imported=validate(JSON.parse(await f.text()));await applyScene(imported.chapter);state=imported;target=state.x;dogX=state.x-65;womanIdleMotion?.reset();dogIdleMotion?.reset();resize();save();updateUI();$('#book').close();say('旧日的脚步，找回来了。');}catch(err){$('#memory-text').textContent=err.message;}e.target.value='';};
-$('#reset').onclick=async()=>{if(!confirm('重新启程会覆盖本浏览器的进度。需要的话，请先导出存档。'))return;await applyScene(1);state=fresh();state.started=true;target=state.x;dogX=state.x-65;for(const n of nuts){n.userData.landed=false;n.userData.fall=0;}active=true;document.body.classList.add('playing');womanIdleMotion?.reset();dogIdleMotion?.reset();resize();save();updateUI();$('#book').close();say('这一次，慢慢走。');};
+$('#import').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{if(f.size>300000)throw Error('存档文件过大');const imported=validate(JSON.parse(await f.text()));await applyScene(imported.chapter);state=imported;target=state.x;dogX=companionX(state.x);womanIdleMotion?.reset();dogIdleMotion?.reset();resize();save();updateUI();$('#book').close();say('旧日的脚步，找回来了。');}catch(err){$('#memory-text').textContent=err.message;}e.target.value='';};
+$('#reset').onclick=async()=>{if(!confirm('重新启程会覆盖本浏览器的进度。需要的话，请先导出存档。'))return;await applyScene(1);state=fresh();state.started=true;target=state.x;dogX=companionX(state.x);for(const n of nuts){n.userData.landed=false;n.userData.fall=0;}active=true;document.body.classList.add('playing');womanIdleMotion?.reset();dogIdleMotion?.reset();resize();save();updateUI();$('#book').close();say('这一次，慢慢走。');};
 addEventListener('pagehide',save);document.addEventListener('visibilitychange',()=>{if(document.hidden){keys.clear();save();}});
 let previous=performance.now();
 function frame(now){const dt=Math.min((now-previous)/1000,.05);previous=now;time+=dt;const paused=!active||dialogOpen()||document.hidden||changingScene;
- const previousX=state.x,pace=womanCycle?.playbackRate??1;
+ const previousX=state.x,pace=womanCycle?.playbackRate??1,previousScale=placement(state.x).scale;
  const dir=(keys.has('d')||keys.has('arrowright')?1:0)-(keys.has('a')||keys.has('arrowleft')?1:0);
  const womanIdle=womanIdleMotion?.update(dt,Boolean(dir)||Math.abs(target-state.x)>.2,paused);
  let moving=false;
- if(!paused&&womanIdle?.allowMove!==false){const speed=(womanCycle?womanCycle.stride*womanCycle.fps/womanCycle.frameCount:110)*pace;if(dir)target=THREE.MathUtils.clamp(state.x+dir*speed*dt,70,1510);const delta=target-state.x;state.x+=Math.sign(delta)*Math.min(Math.abs(delta),speed*dt);moving=Math.abs(state.x-previousX)>.0001;if(moving&&time-lastSaved>2){save();lastSaved=time;}}
- const desiredLeft=THREE.MathUtils.clamp(state.x-viewWidth*.4,0,Math.max(0,1600-viewWidth));cameraLeft+= (desiredLeft-cameraLeft)*Math.min(1,dt*3);cameraTop+=(THREE.MathUtils.clamp(pathY(state.x)-viewHeight*.78,0,900-viewHeight)-cameraTop)*Math.min(1,dt*3);camera.position.set(cameraLeft,cameraTop,20);
- if(womanCycle)womanPhase=advanceWalk(womanPhase,state.x-previousX,womanCycle.stride);
- const womanOffset=womanCycle?(womanCycle.anchorY-.5)*womanCycle.displayHeight:65;
+ if(!paused&&womanIdle?.allowMove!==false){const speed=(womanCycle?womanCycle.stride*womanCycle.fps/womanCycle.frameCount:110)*pace*previousScale;if(dir)target=constrainX(state.x+dir*speed*dt);const delta=target-state.x;state.x+=Math.sign(delta)*Math.min(Math.abs(delta),speed*dt);moving=Math.abs(state.x-previousX)>.0001;if(moving&&time-lastSaved>2){save();lastSaved=time;}}
+ const actorScale=placement(state.x).scale;
+ const desiredLeft=THREE.MathUtils.clamp(state.x-viewWidth*cameraFocus(),0,Math.max(0,1600-viewWidth));cameraLeft+= (desiredLeft-cameraLeft)*Math.min(1,dt*3);cameraTop+=(THREE.MathUtils.clamp(pathY(state.x)-viewHeight*.78,0,900-viewHeight)-cameraTop)*Math.min(1,dt*3);camera.position.set(cameraLeft,cameraTop,20);
+ if(womanCycle)womanPhase=advanceWalk(womanPhase,(state.x-previousX)/((previousScale+actorScale)/2),womanCycle.stride);
+ const womanOffset=(womanCycle?(womanCycle.anchorY-.5)*womanCycle.displayHeight:65)*actorScale;
  woman.position.set(state.x,pathY(state.x)-womanOffset,4);
  const womanIndex=womanCycle?(moving?walkFrame(womanPhase,womanCycle.frameCount):womanCycle.idleFrame):(moving?Math.floor(time*8)%8:0);
  woman.material.map=paintedWomanIdle&&!moving?paintedWomanIdle:paintedWoman?paintedWoman[womanIndex]:(time-strikeAt<.65?strikeFrame:frames[moving?Math.floor(time*9)%8:0]);
- if(womanRest.length&&!moving){const clip=womanIdle?.active?womanRest[womanIdle.clip]:womanRest[0];const offset=showMotion(woman,clip,womanIdle?.active?clip.maps[womanIdle.frame]:clip.idle);woman.position.y=pathY(state.x)-offset;}
+ if(womanRest.length&&!moving){const clip=womanIdle?.active?womanRest[womanIdle.clip]:womanRest[0];const offset=showMotion(woman,clip,womanIdle?.active?clip.maps[womanIdle.frame]:clip.idle);woman.position.y=pathY(state.x)-offset*actorScale;}
  else if(womanCycle){showMotion(woman,{meta:womanCycle},woman.material.map);}
- pole.visible=active&&state.chapter===1&&time-strikeAt<.65;pole.position.set(state.x+29,pathY(state.x)-144,5);pole.rotation.z=Math.sin((time-strikeAt)*Math.PI/.65)*-.2;
- const facing=state.x<previousX-.0001?-1:state.x>previousX+.0001?1:Math.sign(woman.scale.x);woman.scale.x=facing;
- const dogTarget=Math.max(55,state.x-65),previousDogX=dogX;
+ pole.visible=active&&state.chapter===1&&time-strikeAt<.65;pole.position.set(state.x+29*actorScale,pathY(state.x)-144*actorScale,5);pole.scale.set(actorScale,-actorScale,1);pole.rotation.z=Math.sin((time-strikeAt)*Math.PI/.65)*-.2;
+ const facing=state.x<previousX-.0001?-1:state.x>previousX+.0001?1:Math.sign(woman.scale.x);woman.scale.set(facing*actorScale,-actorScale,1);
+ const dogTarget=Math.max(55,state.x-65*actorScale),previousDogX=dogX;
  const dogIdle=dogIdleMotion?.update(dt,Math.abs(dogTarget-dogX)>.08||moving,paused);
  if(!paused&&dogIdle?.allowMove!==false&&Math.abs(dogTarget-dogX)>.08)dogX+=(dogTarget-dogX)*Math.min(1,dt*2.8*pace);
  const dogMoving=Math.abs(dogX-previousDogX)>.0001;
- dog.position.set(dogX,pathY(dogX)-(paintedDog?35:17),5);
+ const dogScale=placement(dogX).scale;
+ dog.position.set(dogX,pathY(dogX)-(paintedDog?35:17)*dogScale,5);
  dogBlend.reset();
  if(dogCycle){
-  dogPhase=advanceWalk(dogPhase,dogX-previousDogX,dogCycle.meta.stride);
+  dogPhase=advanceWalk(dogPhase,(dogX-previousDogX)/dogScale,dogCycle.meta.stride);
   const blend=walkBlend(dogPhase,dogCycle.meta.frameCount,dogCycle.meta.poseFrameStep||1);
   const map=dogMoving?dogCycle.maps[blend.current]:dogCycle.idle;
   if(!dogRest.length||!dogIdle?.active){
-   dog.position.y=pathY(dogX)-showMotion(dog,dogCycle,map);
+   dog.position.y=pathY(dogX)-showMotion(dog,dogCycle,map)*dogScale;
    if(dogMoving)dogBlend.set(map,dogCycle.maps[blend.next],blend.amount);
   }
  }
  else dog.material.map=(paintedDog||dogFrames)[dogMoving?Math.floor(time*10)%8:0];
- if(dogRest.length&&dogIdle?.active){const clip=dogRest[dogIdle.clip];dog.position.y=pathY(dogX)-showMotion(dog,clip,clip.maps[dogIdle.frame]);}
- if(dogMoving)dog.scale.x=dogX<previousDogX?-1:1;
+ if(dogRest.length&&dogIdle?.active){const clip=dogRest[dogIdle.clip];dog.position.y=pathY(dogX)-showMotion(dog,clip,clip.maps[dogIdle.frame])*dogScale;}
+ const dogFacing=dogMoving?(dogX<previousDogX?-1:1):Math.sign(dog.scale.x);dog.scale.set(dogFacing*dogScale,-dogScale,1);
  nuts.forEach((n,i)=>{n.visible=state.chapter===1&&i<state.hits&&!state.collected.includes(i);if(n.visible){n.userData.fall=Math.min(1,n.userData.fall+dt*.8);n.userData.landed=n.userData.fall>=1;n.position.y=THREE.MathUtils.lerp(420,pathY(n.position.x)-5,n.userData.fall*n.userData.fall);n.rotation.z=n.userData.landed?Math.sin(time*2+i)*.06:time*3;}});
  memoryCards.forEach((card,i)=>{card.material.map=memoryTextures[(state.collage[i]??(i+1))-1];card.visible=state.chapter===10&&state.journey[10]>=1;card.position.y=pathY(card.position.x)-200;});
  leaves.forEach(l=>{l.position.x-=dt*l.userData.speed;if(l.position.x<0)l.position.x=1600;l.position.y+=Math.sin(time*.7+l.userData.phase)*dt*5;l.rotation.z=Math.sin(time+l.userData.phase)*.5;});
  const near=nearestNut(),tree=(state.chapter>=2||state.hits<3)&&Math.abs(state.x-interactionX())<155;
  $('#interact').hidden=paused||(!near&&!tree);if(!$('#interact').hidden)$('#interact').innerHTML=state.chapter>=3?(state.chapter===10&&state.journey[10]>=1?'收好画册，回家 <span>E</span>':'走进这段回忆 <span>E</span>'):state.chapter===2?(state.garden.step===4?'翻看树下的回忆 <span>E</span>':'照料枣树 <span>E</span>'):near?'捡起核桃 <span>E</span>':'敲打核桃树 <span>E</span>';
- $('#subtitle').style.setProperty('--subtitle-offset',viewWidth<viewHeight?`${Math.max(110,viewportHeight-(pathY(state.x)-140-cameraTop)/viewHeight*viewportHeight+12)}px`:'110px');
+ $('#subtitle').style.setProperty('--subtitle-offset',viewWidth<viewHeight?`${Math.max(110,viewportHeight-(pathY(state.x)-150*actorScale-cameraTop)/viewHeight*viewportHeight+12)}px`:'110px');
  if(now>dialogueUntil)$('#subtitle').classList.remove('visible');renderer.render(scene,camera);
 }
 renderer.setAnimationLoop(frame);

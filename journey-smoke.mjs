@@ -5,7 +5,7 @@ await p.addInitScript(()=>{if(!localStorage.getItem('the-way-home.save.v1'))loca
 await p.goto(process.env.GAME_URL||'http://127.0.0.1:4173/');await p.waitForSelector('.loading',{state:'detached'});await p.locator('#start').click();await p.locator('#journal').click();await p.locator('[data-visit="3"]').click();
 const choose=id=>p.locator(`[data-choice="${id}"]`).click();
 for(const c of chapters.filter(c=>c.id>=3)){
- await expect(p.locator('#chapter h2')).toHaveText(c.title);await p.keyboard.down('ArrowRight');await p.waitForTimeout(9500);await p.keyboard.up('ArrowRight');await p.locator('#interact').click();
+ await expect(p.locator('#chapter h2')).toHaveText(c.title);await p.keyboard.down('ArrowRight');await expect(p.locator('#interact')).toBeVisible({timeout:60000});await p.keyboard.up('ArrowRight');await p.locator('#interact').click();
  for(let i=0;i<c.tasks.length;i++){
   const t=c.tasks[i];await expect(p.locator('#journey-title')).toHaveText(t.title);
   if(['collect','observe'].includes(t.type)){for(let n=0;n<t.items.length;n++)await choose('object-'+n);await p.locator('#collect-finish').click();}

@@ -5,7 +5,7 @@ page.on('pageerror',e=>errors.push(e.message));
 await page.goto(process.env.GAME_URL || 'http://127.0.0.1:4173/');await page.waitForSelector('.loading',{state:'detached'});await page.waitForTimeout(500);
 await page.screenshot({path:'test-results/title.png'});await page.locator('#start').click();
 const speed=await page.evaluate(async()=>{try{const r=await fetch(new URL('assets/woman-walk-video.json',location.href));if(!r.ok)return 110;const c=await r.json();return c.stride*c.fps/c.frameCount*(c.playbackRate??1);}catch{return 110;}});
-await page.keyboard.down('ArrowRight');await page.waitForTimeout(Math.ceil(1000/speed*1000)+300);await page.keyboard.up('ArrowRight');await page.waitForTimeout(500);
+await page.keyboard.down('ArrowRight');await expect(page.locator('#interact')).toBeVisible({timeout:60000});await page.keyboard.up('ArrowRight');await page.waitForTimeout(500);
 await page.screenshot({path:'test-results/tree.png'});
 for(let i=0;i<6;i++){const s=await page.evaluate(()=>JSON.parse(localStorage.getItem('the-way-home.save.v1')));if(s.hits===3)break;await page.locator('#interact').click();await page.waitForTimeout(1450);}
 let previousTarget=1320;for(const x of [1200,1330,1430]){await page.mouse.click(x-160,735);await page.waitForTimeout(Math.ceil((Math.abs(x-previousTarget)+30)/speed*1000)+500);previousTarget=x;if(await page.locator('#interact').isVisible()){await page.locator('#interact').click();await page.waitForTimeout(150);}}
