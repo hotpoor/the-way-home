@@ -76,6 +76,10 @@ export function createJourney({dialog,getState,onChange,onComplete,onWalk,onStag
  function renderRide(task){
   shell(task,`<div class="ride-stage"><canvas width="720" height="360" aria-label="三条车道的骑行路，使用上下方向键或下方按钮换道"></canvas><div class="ride-hud"><span id="ride-distance">路程 0%</span><span id="ride-note">先看看前面的路。</span></div></div><div class="ride-controls">${[0,1,2].map((n)=>`<button data-lane="${n}" aria-pressed="${n===1}">${['上方车道','中间车道','下方车道'][n]}</button>`).join('')}${task.vehicle==='motorcycle'?'<button id="ride-brake">按住，慢一点</button>':''}<button class="primary" id="ride-start">准备好了，出发</button></div>`);
   const canvas=$(body,'canvas'),ctx=canvas.getContext('2d'),abort=new AbortController();let lane=1,distance=0,started=false,brake=false,hitUntil=0,previous=0,raf=0,alive=true;
+  // Keep game coordinates independent of CSS size and the screen's pixel density.
+  const resizeCanvas=()=>{const scale=Math.min(3,window.devicePixelRatio||1)*canvas.getBoundingClientRect().width/720;canvas.width=Math.max(1,Math.round(720*scale));canvas.height=Math.max(1,Math.round(360*scale));ctx.setTransform(canvas.width/720,0,0,canvas.height/360,0,0);ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';};
+  const resizeObserver=new ResizeObserver(resizeCanvas);resizeObserver.observe(canvas);window.addEventListener('resize',resizeCanvas,{signal:abort.signal});
+  const drawSprite=(image,x,ground,width)=>{const height=width*image.naturalHeight/image.naturalWidth;ctx.drawImage(image,x-width/2,ground-height,width,height);};
   let sprites=null;$(body,'#ride-start').disabled=true;status('正在把车子和路上的物件准备好……');
   Promise.all([loadProp(task.vehicle),loadProp('road-stone'),loadProp('puddle')]).then(images=>{if(!alive)return;sprites=images;$(body,'#ride-start').disabled=false;status('车子准备好了，按自己的节奏出发。');}).catch(()=>{if(alive)status('道具图片暂时没有加载好，可以收起这页再试一次。');});
   const hazards=Array.from({length:10},(_,i)=>({distance:200+i*110,lane:[1,0,2,1,2,0,1,0,2,1][i],passed:false}));
@@ -88,12 +92,12 @@ export function createJourney({dialog,getState,onChange,onComplete,onWalk,onStag
   function draw(now){if(!alive)return;const dt=previous?Math.min(.05,(now-previous)/1000):0;previous=now;
    if(started&&!document.hidden){const speed=now<hitUntil?32:brake?40:80;distance=Math.min(1400,distance+dt*speed);}
    ctx.fillStyle='#c9c29b';ctx.fillRect(0,0,720,360);ctx.fillStyle='#e0cca1';ctx.fillRect(0,55,720,245);ctx.strokeStyle='#ab9d79';ctx.lineWidth=2;ctx.setLineDash([18,20]);for(const y of [136,218]){ctx.beginPath();ctx.moveTo(-(distance%38),y);ctx.lineTo(720,y);ctx.stroke();}ctx.setLineDash([]);
-   for(const h of hazards){const x=140+(h.distance-distance)*1.3,y=95+h.lane*82;if(sprites&&x>-40&&x<760){ctx.drawImage(h.lane===2?sprites[2]:sprites[1],x-38,y-28,76,56);}if(started&&!h.passed&&distance>=h.distance){h.passed=true;if(h.lane===lane&&!(task.vehicle==='motorcycle'&&brake)){hitUntil=now+900;$(body,'#ride-note').textContent='颠了一下，慢一点再走。';}else $(body,'#ride-note').textContent=brake?'她减速，等后座的人坐稳。':'这一处，平稳地绕过去了。';}}
-   const y=95+lane*82;if(sprites)ctx.drawImage(sprites[0],84,y-46,112,92);
+   for(const h of hazards){const x=140+(h.distance-distance)*1.3,y=95+h.lane*82;if(sprites&&x>-50&&x<770){drawSprite(h.lane===2?sprites[2]:sprites[1],x,y+24,h.lane===2?92:64);}if(started&&!h.passed&&distance>=h.distance){h.passed=true;if(h.lane===lane&&!(task.vehicle==='motorcycle'&&brake)){hitUntil=now+900;$(body,'#ride-note').textContent='颠了一下，慢一点再走。';}else $(body,'#ride-note').textContent=brake?'她减速，等后座的人坐稳。':'这一处，平稳地绕过去了。';}}
+   const y=95+lane*82;if(sprites)drawSprite(sprites[0],140,y+28,136);
    $(body,'#ride-distance').textContent=`路程 ${Math.floor(distance/14)}%`;
    if(distance>=1400){finish();return;}raf=requestAnimationFrame(draw);
   }
-  dispose=()=>{alive=false;cancelAnimationFrame(raf);abort.abort();};raf=requestAnimationFrame(draw);
+  dispose=()=>{alive=false;cancelAnimationFrame(raf);resizeObserver.disconnect();abort.abort();};raf=requestAnimationFrame(draw);
  }
  return {open(id){chapter=chapterById(id);review=(state().journey[id]??0)>=chapter.tasks.length;index=id===10&&resumeHome?1:review?0:(state().journey[id]??0);resumeHome=false;showResult=false;feedback='';render();dialog.showModal();dialog.scrollTop=0;}};
 }

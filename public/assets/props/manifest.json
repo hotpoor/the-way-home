@@ -30,10 +30,10 @@
   {
     "id": "bicycle",
     "size": [
-      384,
-      384
+      768,
+      755
     ],
-    "bytes": 87292,
+    "bytes": 360936,
     "sourceBounds": [
       0,
       21,
@@ -114,10 +114,10 @@
   {
     "id": "motorcycle",
     "size": [
-      384,
-      384
+      768,
+      756
     ],
-    "bytes": 86292,
+    "bytes": 391288,
     "sourceBounds": [
       0,
       19,
@@ -156,10 +156,10 @@
   {
     "id": "puddle",
     "size": [
-      384,
-      384
+      768,
+      756
     ],
-    "bytes": 51512,
+    "bytes": 247912,
     "sourceBounds": [
       0,
       19,
@@ -170,10 +170,10 @@
   {
     "id": "road-stone",
     "size": [
-      384,
-      384
+      768,
+      759
     ],
-    "bytes": 79868,
+    "bytes": 394120,
     "sourceBounds": [
       0,
       29,

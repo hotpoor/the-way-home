@@ -7,9 +7,15 @@ records=[]
 for src in sorted(a.source.glob('*.png')):
  im=Image.open(src).convert('RGBA');alpha=im.getchannel('A');assert alpha.getextrema()==(0,255),f'{src.name}: expected genuine transparency'
  box=alpha.getbbox();assert box
- cut=im.crop(box);cut.thumbnail((336,336),Image.Resampling.LANCZOS)
- image=Image.new('RGBA',(384,384));image.alpha_composite(cut,((384-cut.width)//2,(384-cut.height)//2));dest=a.output/(src.stem+'.webp');image.save(dest,lossless=True,method=6)
+ cut=im.crop(box)
+ if src.stem in {'bicycle','motorcycle','road-stone','puddle'}:
+  # Canvas sprites use tight bounds and their native aspect ratio, at up to 3x display resolution.
+  cut.thumbnail((768,768),Image.Resampling.LANCZOS);image=cut
+ else:
+  cut.thumbnail((336,336),Image.Resampling.LANCZOS)
+  image=Image.new('RGBA',(384,384));image.alpha_composite(cut,((384-cut.width)//2,(384-cut.height)//2))
+ dest=a.output/(src.stem+'.webp');image.save(dest,lossless=True,method=6)
  assert Image.open(dest).getchannel('A').tobytes()==image.getchannel('A').tobytes()
- records.append({'id':src.stem,'size':[384,384],'bytes':dest.stat().st_size,'sourceBounds':list(box)})
+ records.append({'id':src.stem,'size':list(image.size),'bytes':dest.stat().st_size,'sourceBounds':list(box)})
  print(src.stem,im.size,alpha.getextrema(),dest.stat().st_size)
 (a.output/'manifest.json').write_text(json.dumps(records,indent=2)+'\n')
